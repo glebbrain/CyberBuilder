@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Recipes",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "objectId": { "type": "string" },
+      "components": { "type": "array" },
+      "seconds": { "type": "number" }
+    },
+    "required": ["objectId", "components", "seconds"]
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "id": "broken_example_pack",
+  "name": "Broken example (local test data)",
+  "version": "0.0.0",
+  "author": "CyberBuilder",
+  "requires": ["world_builder"]
+}

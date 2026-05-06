@@ -1,0 +1,14 @@
+{
+  "packsDir": "packs",
+  "distDir": "dist",
+  "luaExecutable": null,
+  "worldBuilderSpawnablesDir": null,
+  "ignoredPackIds": ["broken_example_pack"],
+  "logging": {
+    "level": "INFO",
+    "targets": ["console", "files"],
+    "mainFileName": "cyberbuilder.log",
+    "errorFileName": "cyberbuilder_errors.log",
+    "externalEnabled": false
+  }
+}

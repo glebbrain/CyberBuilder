@@ -1,0 +1,7 @@
+{
+  "id": "starter_furniture",
+  "name": "Starter Furniture",
+  "version": "0.1.0",
+  "author": "CyberBuilder",
+  "requires": ["world_builder"]
+}

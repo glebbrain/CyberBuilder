@@ -1,0 +1,21 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+.manager/
+
+# Logs and temp
+*.log
+*.tmp
+*.temp
+
+# Build/output
+dist/
+build/
+out/
+
+# Project-local payloads (must stay untracked)
+distr/*

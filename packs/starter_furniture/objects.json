@@ -1,0 +1,38 @@
+[
+  {
+    "id": "starter_chair_01",
+    "name": "Starter Chair (placeholder)",
+    "type": "mesh",
+    "resourcePath": "",
+    "category": "furniture",
+    "price": 0,
+    "tags": ["placeholder", "seating"],
+    "buildable": true,
+    "deletable": true,
+    "disabled": true
+  },
+  {
+    "id": "starter_table_01",
+    "name": "Starter Table (placeholder)",
+    "type": "mesh",
+    "resourcePath": "",
+    "category": "furniture",
+    "price": 0,
+    "tags": ["placeholder", "surface"],
+    "buildable": true,
+    "deletable": true,
+    "disabled": true
+  },
+  {
+    "id": "starter_lamp_01",
+    "name": "Starter Lamp (placeholder)",
+    "type": "light",
+    "resourcePath": "",
+    "category": "furniture",
+    "price": 0,
+    "tags": ["placeholder", "lighting"],
+    "buildable": true,
+    "deletable": true,
+    "disabled": true
+  }
+]

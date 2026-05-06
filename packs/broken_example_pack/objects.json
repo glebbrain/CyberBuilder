@@ -1,0 +1,26 @@
+[
+  {
+    "id": "dup_id",
+    "name": "Duplicate row A",
+    "type": "mesh",
+    "resourcePath": "",
+    "category": "test",
+    "price": 0,
+    "tags": ["broken"],
+    "buildable": false,
+    "deletable": true,
+    "disabled": true
+  },
+  {
+    "id": "dup_id",
+    "name": "Duplicate row B",
+    "type": "mesh",
+    "resourcePath": "",
+    "category": "test",
+    "price": 0,
+    "tags": ["broken"],
+    "buildable": false,
+    "deletable": true,
+    "disabled": true
+  }
+]

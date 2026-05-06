@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Objects",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "string" },
+      "name": { "type": "string" },
+      "type": { "type": "string" },
+      "resourcePath": { "type": "string" },
+      "category": { "type": "string" },
+      "price": { "type": "number" },
+      "tags": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "buildable": { "type": "boolean" },
+      "deletable": { "type": "boolean" }
+    },
+    "required": [
+      "id",
+      "name",
+      "type",
+      "resourcePath",
+      "category",
+      "price",
+      "tags",
+      "buildable",
+      "deletable"
+    ]
+  }
+}
