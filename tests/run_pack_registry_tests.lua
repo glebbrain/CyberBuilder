@@ -33,6 +33,7 @@ local pack_registry = dofile(path_utils.join(cyber_dir, "pack_registry.lua"))
 local schema_validator = dofile(path_utils.join(cyber_dir, "schema_validator.lua"))
 local json_loader = dofile(path_utils.join(cyber_dir, "json_loader.lua"))
 local worldbuilder_exporter = dofile(path_utils.join(cyber_dir, "worldbuilder_exporter.lua"))
+local catalog_service = dofile(path_utils.join(cyber_dir, "catalog_service.lua"))
 local logger = dofile(path_utils.join(cyber_dir, "logger.lua"))
 
 local failures = 0
@@ -83,6 +84,285 @@ do
   }
   local pok, perrs = schema_validator.validate_pack(pack)
   assert_true(pok == true and perrs == nil, name, tostring(perrs))
+end
+
+-- catalog_service: generate catalog from valid starter pack
+do
+  local name = "catalog_service.from_validated_packs(valid starter pack)"
+  local pack_root = path_utils.join(repo, "packs", "starter_furniture")
+  local pack, pack_err = json_loader.read(path_utils.join(pack_root, "pack.json"))
+  local objects, objects_err = json_loader.read(path_utils.join(pack_root, "objects.json"))
+  local recipes, recipes_err = json_loader.read(path_utils.join(pack_root, "recipes.json"))
+  if not pack or not objects or not recipes then
+    fail(
+      string.format(
+        "[FAIL] %s — could not load starter pack files: pack=%s objects=%s recipes=%s",
+        name,
+        tostring(pack_err),
+        tostring(objects_err),
+        tostring(recipes_err)
+      )
+    )
+  else
+    local pok, perrs = schema_validator.validate_pack(pack)
+    local ook, oerrs = schema_validator.validate_objects(objects)
+    local rok, rerrs = schema_validator.validate_recipes(recipes, objects)
+    if not (pok and ook and rok) then
+      fail(
+        string.format(
+          "[FAIL] %s — starter pack failed validation: pack=%s objects=%s recipes=%s",
+          name,
+          tostring(perrs and table.concat(perrs, "; ") or nil),
+          tostring(oerrs and table.concat(oerrs, "; ") or nil),
+          tostring(rerrs and table.concat(rerrs, "; ") or nil)
+        )
+      )
+    else
+      local validated = {
+        { pack = pack, objects = objects, recipes = recipes, sourceFile = "objects.json" },
+      }
+      local items, err = catalog_service.from_validated_packs(validated)
+      local debug_items, debug_err = catalog_service.from_validated_packs(validated, { showDisabled = true })
+      local expected_debug_count = #objects
+      assert_true(
+        type(items) == "table"
+          and err == nil
+          and #items == 0
+          and type(debug_items) == "table"
+          and debug_err == nil
+          and #debug_items == expected_debug_count,
+        name,
+        string.format(
+          "expected default=0 and debug=%d items, got default=%s debug=%s errs=(%s,%s)",
+          expected_debug_count,
+          tostring(items and #items or "nil"),
+          tostring(debug_items and #debug_items or "nil"),
+          tostring(err),
+          tostring(debug_err)
+        )
+      )
+    end
+  end
+end
+
+-- catalog_service: disabled objects hidden by default
+do
+  local name = "catalog_service.from_validated_packs(disabled hidden by default)"
+  local validated = {
+    {
+      pack = { id = "demo_pack" },
+      objects = {
+        {
+          id = "hidden_01",
+          name = "Hidden",
+          type = "mesh",
+          resourcePath = "props/hidden.mesh",
+          category = "furniture",
+          price = 0,
+          tags = { "hidden" },
+          disabled = true,
+        },
+        {
+          id = "visible_01",
+          name = "Visible",
+          type = "mesh",
+          resourcePath = "props/visible.mesh",
+          category = "furniture",
+          price = 0,
+          tags = { "visible" },
+        },
+      },
+      recipes = {},
+      sourceFile = "objects.json",
+    },
+  }
+  local items, err = catalog_service.from_validated_packs(validated)
+  local debug_items, debug_err = catalog_service.from_validated_packs(validated, { showDisabled = true })
+  local hidden_default = type(items) == "table" and #items == 1 and items[1].id == "visible_01"
+  local debug_has_both = type(debug_items) == "table" and #debug_items == 2
+  assert_true(
+    err == nil and debug_err == nil and hidden_default and debug_has_both,
+    name,
+    string.format(
+      "expected default visible-only and debug include-disabled; got default=%s debug=%s errs=(%s,%s)",
+      tostring(items and #items or "nil"),
+      tostring(debug_items and #debug_items or "nil"),
+      tostring(err),
+      tostring(debug_err)
+    )
+  )
+end
+
+-- catalog_service: category index generation
+do
+  local name = "catalog_service.build_category_index(generates category buckets)"
+  local items = {
+    { id = "a", category = "furniture" },
+    { id = "b", category = "decor" },
+    { id = "c", category = "furniture" },
+    { id = "d", category = "lighting" },
+  }
+  local index, err = catalog_service.build_category_index(items)
+  local ok_index = type(index) == "table"
+    and err == nil
+    and type(index.furniture) == "table"
+    and type(index.decor) == "table"
+    and type(index.lighting) == "table"
+    and #index.furniture == 2
+    and #index.decor == 1
+    and #index.lighting == 1
+    and index.furniture[1].id == "a"
+    and index.furniture[2].id == "c"
+  assert_true(
+    ok_index,
+    name,
+    string.format(
+      "expected buckets furniture=2 decor=1 lighting=1; got err=%s",
+      tostring(err)
+    )
+  )
+end
+
+-- catalog_service: search by name
+do
+  local name = "catalog_service.search(matches by name substring)"
+  local items = {
+    { id = "a1", name = "Starter Chair", category = "furniture", resourcePath = "x", tags = { "seat" } },
+    { id = "b1", name = "Steel Table", category = "furniture", resourcePath = "y", tags = { "surface" } },
+    { id = "c1", name = "Neon Lamp", category = "lighting", resourcePath = "z", tags = { "light" } },
+  }
+  local matches, err = catalog_service.search(items, "chair")
+  local ok_search = type(matches) == "table" and err == nil and #matches == 1 and matches[1].id == "a1"
+  assert_true(
+    ok_search,
+    name,
+    string.format("expected one match (a1) for query 'chair'; got err=%s count=%s", tostring(err), tostring(matches and #matches or "nil"))
+  )
+end
+
+-- catalog_service: search by tag
+do
+  local name = "catalog_service.search(matches by tag substring)"
+  local items = {
+    { id = "a1", name = "Starter Chair", category = "furniture", resourcePath = "x", tags = { "seating", "indoor" } },
+    { id = "b1", name = "Steel Table", category = "furniture", resourcePath = "y", tags = { "surface" } },
+    { id = "c1", name = "Neon Lamp", category = "lighting", resourcePath = "z", tags = { "lighting", "neon" } },
+  }
+  local matches, err = catalog_service.search(items, "seat")
+  local ok_search = type(matches) == "table" and err == nil and #matches == 1 and matches[1].id == "a1"
+  assert_true(
+    ok_search,
+    name,
+    string.format("expected one tag match (a1) for query 'seat'; got err=%s count=%s", tostring(err), tostring(matches and #matches or "nil"))
+  )
+end
+
+-- catalog_service: duplicate global catalog id rejection
+do
+  local name = "catalog_service.validate_no_duplicate_global_ids(rejects duplicates)"
+  local items = {
+    { id = "obj_01", packId = "pack_a", name = "First" },
+    { id = "obj_01", packId = "pack_a", name = "Duplicate" },
+  }
+  local ok_dup, err = catalog_service.validate_no_duplicate_global_ids(items)
+  local rejected = ok_dup == false and type(err) == "string" and err:find("duplicate global catalog id", 1, true) ~= nil
+  assert_true(
+    rejected,
+    name,
+    string.format("expected duplicate rejection, got ok=%s err=%s", tostring(ok_dup), tostring(err))
+  )
+end
+
+-- catalog_service: negative price rejection
+do
+  local name = "catalog_service.validate_non_negative_prices(rejects negative)"
+  local items = {
+    { id = "obj_ok", packId = "pack_a", price = 0 },
+    { id = "obj_bad", packId = "pack_a", price = -1 },
+  }
+  local ok_price, err = catalog_service.validate_non_negative_prices(items)
+  local rejected = ok_price == false and type(err) == "string" and err:find("negative price", 1, true) ~= nil
+  assert_true(
+    rejected,
+    name,
+    string.format("expected negative price rejection, got ok=%s err=%s", tostring(ok_price), tostring(err))
+  )
+end
+
+-- catalog_service: invalid tags rejection
+do
+  local name = "catalog_service.validate_lowercase_tags(rejects invalid tags)"
+  local items = {
+    { id = "obj_ok", packId = "pack_a", tags = { "valid", "lowercase" } },
+    { id = "obj_bad", packId = "pack_a", tags = { "InvalidTag" } },
+  }
+  local ok_tags, err = catalog_service.validate_lowercase_tags(items)
+  local rejected = ok_tags == false and type(err) == "string" and err:find("non-lowercase tag", 1, true) ~= nil
+  assert_true(
+    rejected,
+    name,
+    string.format("expected invalid tag rejection, got ok=%s err=%s", tostring(ok_tags), tostring(err))
+  )
+end
+
+-- catalog_service: deterministic cyberbuilder_catalog.json output
+do
+  local name = "catalog_service.export_catalog_snapshot(deterministic output)"
+  local tmp_root = path_utils.join(TEST_DIR, "_tmp_catalog_snapshot")
+  local items = {
+    {
+      id = "b_obj",
+      packId = "pack_z",
+      name = "Beta",
+      type = "mesh",
+      category = "furniture",
+      tags = { "decor", "indoor" },
+      price = 10,
+      resourcePath = "props/beta.mesh",
+      recipe = { objectId = "b_obj", seconds = 5, components = {} },
+      sourceFile = "objects.json",
+    },
+    {
+      id = "a_obj",
+      packId = "pack_a",
+      name = "Alpha",
+      type = "mesh",
+      category = "furniture",
+      tags = { "decor" },
+      price = 1,
+      resourcePath = "props/alpha.mesh",
+      recipe = { objectId = "a_obj", seconds = 1, components = {} },
+      sourceFile = "objects.json",
+    },
+  }
+  local sorted, sort_err = catalog_service.sort_items(items)
+  if not sorted then
+    fail(string.format("[FAIL] %s — could not sort items: %s", name, tostring(sort_err)))
+  else
+    local out1, err1 = catalog_service.export_catalog_snapshot(sorted, tmp_root)
+    if not out1 then
+      fail(string.format("[FAIL] %s — first export failed: %s", name, tostring(err1)))
+    else
+      local f1 = io.open(out1, "rb")
+      local body1 = f1 and f1:read("*a") or nil
+      if f1 then
+        f1:close()
+      end
+      local out2, err2 = catalog_service.export_catalog_snapshot(sorted, tmp_root)
+      if not out2 then
+        fail(string.format("[FAIL] %s — second export failed: %s", name, tostring(err2)))
+      else
+        local f2 = io.open(out2, "rb")
+        local body2 = f2 and f2:read("*a") or nil
+        if f2 then
+          f2:close()
+        end
+        local deterministic = type(body1) == "string" and body1 ~= "" and body1 == body2
+        assert_true(deterministic, name, "expected catalog snapshot bytes to match across repeated exports")
+        pcall(os.remove, out2)
+      end
+    end
+  end
 end
 
 -- validate_pack: bad id slug

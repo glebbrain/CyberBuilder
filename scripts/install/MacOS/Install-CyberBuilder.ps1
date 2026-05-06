@@ -19,7 +19,8 @@
     Attempt to install Lua via Homebrew (`brew install lua`).
 
 .PARAMETER InstallLfs
-    Attempt to install LuaRocks via Homebrew and then `luarocks install luafilesystem`.
+    Attempt to install LuaRocks via Homebrew and then install LuaFileSystem (`lfs`) from GitHub
+    (with LuaRocks registry fallback).
 
 .PARAMETER DryRun
     Run CyberBuilder self-test using `--dry-run` (default: true).
@@ -140,6 +141,23 @@ function Get-LuaVersion {
     }
 }
 
+function Write-DependencyCheckOutput {
+    param(
+        [Parameter(Mandatory = $true)][string] $Name,
+        [Parameter(Mandatory = $true)][bool] $Found,
+        [Parameter(Mandatory = $true)][bool] $VersionUnknown,
+        [string] $InstallPath = ''
+    )
+    $entry = [ordered]@{
+        dependency     = $Name
+        found          = $Found
+        missing        = (-not $Found)
+        versionUnknown = $VersionUnknown
+        installPath    = $InstallPath
+    }
+    Write-Host ("dependency-check: {0}" -f (($entry | ConvertTo-Json -Compress))) -ForegroundColor DarkGray
+}
+
 function Install-OrUpdateLuaMac {
     if (-not (Test-Command -Name 'brew')) {
         Write-Host 'Homebrew not found. Install Homebrew first.' -ForegroundColor Yellow
@@ -155,6 +173,7 @@ $links = [ordered]@{
     'Lua downloads' = 'https://www.lua.org/download.html'
     'Homebrew'      = 'https://brew.sh/'
     'LuaRocks'      = 'https://luarocks.org/'
+    'LuaFileSystem GitHub' = 'https://github.com/lunarmodules/luafilesystem'
 }
 
 if (-not $RepoRoot) {
@@ -196,10 +215,13 @@ if ($luaMissing -or $luaOutdated -or $InstallMode -eq 'Fresh') {
 }
 
 if (-not (Test-Command -Name 'lua')) {
+    Write-DependencyCheckOutput -Name 'lua' -Found $false -VersionUnknown $false -InstallPath ''
+    Write-DependencyCheckOutput -Name 'lfs' -Found $false -VersionUnknown $false -InstallPath ''
     throw 'Lua is required. Aborting.'
 }
 
-Write-Host ('Lua found: {0}' -f (Get-Command lua).Source) -ForegroundColor Green
+$luaPath = (Get-Command lua).Source
+Write-Host ('Lua found: {0}' -f $luaPath) -ForegroundColor Green
 
 if ($InstallLfs -or $InstallMode -eq 'Fresh') {
     if (-not (Test-Command -Name 'brew')) {
@@ -212,12 +234,23 @@ if ($InstallLfs -or $InstallMode -eq 'Fresh') {
             try { & brew upgrade luarocks } catch { }
         }
         if (Test-Command -Name 'luarocks') {
-            Write-Host 'Installing/updating luafilesystem (lfs) via luarocks...' -ForegroundColor Cyan
-            try { & luarocks install luafilesystem } catch { }
-            try { & luarocks update luafilesystem } catch { }
+            $lfsGithubRockspec = 'https://raw.githubusercontent.com/lunarmodules/luafilesystem/master/luafilesystem-scm-1.rockspec'
+            Write-Host 'Installing/updating luafilesystem (lfs) from GitHub via luarocks...' -ForegroundColor Cyan
+            try {
+                & luarocks install $lfsGithubRockspec
+            } catch {
+                try {
+                    & luarocks make $lfsGithubRockspec
+                } catch {
+                    Write-Host 'GitHub lfs install failed, trying LuaRocks registry fallback...' -ForegroundColor Yellow
+                    try { & luarocks install luafilesystem } catch { }
+                    try { & luarocks update luafilesystem } catch { }
+                }
+            }
         } else {
             Write-Host 'luarocks still not found after install attempt.' -ForegroundColor Yellow
             Write-Host ("  Link: {0}" -f $links['LuaRocks']) -ForegroundColor DarkGray
+            Write-Host ("  GitHub: {0}" -f $links['LuaFileSystem GitHub']) -ForegroundColor DarkGray
         }
     }
 }
@@ -229,6 +262,11 @@ try {
     if ($LASTEXITCODE -eq 0) { $lfsOk = $true }
 } catch { }
 Write-Host ("lfs available = {0}" -f $lfsOk) -ForegroundColor $(if ($lfsOk) { 'Green' } else { 'DarkYellow' })
+$luaVersionUnknown = [bool]((Test-Command -Name 'lua') -and -not $luaVersion)
+$lfsVersionUnknown = [bool]$lfsOk
+$lfsInstallPath = if ($lfsOk -and (Test-Command -Name 'luarocks')) { 'luarocks:luafilesystem' } else { '' }
+Write-DependencyCheckOutput -Name 'lua' -Found $true -VersionUnknown $luaVersionUnknown -InstallPath $luaPath
+Write-DependencyCheckOutput -Name 'lfs' -Found $lfsOk -VersionUnknown $lfsVersionUnknown -InstallPath $lfsInstallPath
 if (-not $lfsOk) {
     Write-Host 'Note: pack discovery on macOS requires lfs. Re-run with -InstallLfs (recommended).' -ForegroundColor Yellow
 }

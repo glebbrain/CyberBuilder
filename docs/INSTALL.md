@@ -60,6 +60,13 @@ The orchestration scripts in the install root already follow this sequence.
 
 ## Quick start commands
 
+### Dependency helper scripts
+
+Use these root-level helpers when you only want dependency checks/install flow:
+
+- `scripts/install/check-deps.ps1`
+- `scripts/install/install-deps.ps1`
+
 ### Windows (recommended)
 
 ```powershell

@@ -19,7 +19,8 @@
     Attempt to install Lua (uses winget when available; otherwise opens Lua download page).
 
 .PARAMETER InstallLfs
-    Attempt to install LuaRocks and then `luarocks install luafilesystem` (best-effort).
+    Attempt to install LuaRocks and then install LuaFileSystem (`lfs`) from GitHub (best-effort),
+    with LuaRocks registry fallback.
 
 .PARAMETER DryRun
     Run CyberBuilder self-test using `--dry-run` (default: true).
@@ -215,6 +216,23 @@ function Get-LuaVersion {
     }
 }
 
+function Write-DependencyCheckOutput {
+    param(
+        [Parameter(Mandatory = $true)][string] $Name,
+        [Parameter(Mandatory = $true)][bool] $Found,
+        [Parameter(Mandatory = $true)][bool] $VersionUnknown,
+        [string] $InstallPath = ''
+    )
+    $entry = [ordered]@{
+        dependency     = $Name
+        found          = $Found
+        missing        = (-not $Found)
+        versionUnknown = $VersionUnknown
+        installPath    = $InstallPath
+    }
+    Write-Host ("dependency-check: {0}" -f (($entry | ConvertTo-Json -Compress))) -ForegroundColor DarkGray
+}
+
 function Install-OrUpdateLua {
     if (Test-Command -Name 'winget') {
         Write-Host 'Installing/updating Lua via winget...' -ForegroundColor Cyan
@@ -259,9 +277,119 @@ function Install-OrUpdateLua {
     }
 }
 
+function Install-OrUpdateLuaRocks {
+    if (Test-Command -Name 'luarocks') { return }
+
+    if (Test-Command -Name 'winget') {
+        Write-Host 'Installing LuaRocks via winget...' -ForegroundColor Cyan
+        try {
+            winget install --id LuaRocks.LuaRocks --source winget --accept-package-agreements --accept-source-agreements
+        } catch {
+            try {
+                winget upgrade --id LuaRocks.LuaRocks --source winget --accept-package-agreements --accept-source-agreements
+            } catch { }
+        }
+    } elseif (Test-Command -Name 'scoop') {
+        Write-Host 'Installing LuaRocks via Scoop...' -ForegroundColor Cyan
+        try { scoop install luarocks } catch { try { scoop update luarocks } catch { } }
+    } elseif (Test-Command -Name 'choco') {
+        if (Test-IsAdministrator) {
+            Write-Host 'Installing LuaRocks via Chocolatey...' -ForegroundColor Cyan
+            try { choco upgrade luarocks --yes --no-progress --limit-output } catch { try { choco install luarocks --yes --no-progress --limit-output } catch { } }
+        }
+    }
+}
+
+function Install-OrUpdateCCompiler {
+    if (Test-Command -Name 'x86_64-w64-mingw32-gcc') { return }
+    if (Test-Command -Name 'gcc') { return }
+
+    $toolsRoot = Join-Path $RepoRoot 'tools\mingw-w64-github'
+    $existing = Get-ChildItem -Path $toolsRoot -Recurse -File -Filter 'x86_64-w64-mingw32-gcc.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($existing) {
+        $binDir = Split-Path -Parent $existing.FullName
+        if ($env:Path -notlike "*$binDir*") { $env:Path = "$binDir;$env:Path" }
+        return
+    }
+
+    Write-Host 'Installing MinGW-w64 compiler from GitHub releases...' -ForegroundColor Cyan
+    try {
+        $release = Invoke-RestMethod -Headers @{ 'User-Agent'='CyberBuilder-Installer' } -Uri 'https://api.github.com/repos/xpack-dev-tools/mingw-w64-gcc-xpack/releases/latest'
+        $asset = $release.assets | Where-Object { $_.name -match 'win32-x64.*\.zip$' } | Select-Object -First 1
+        if ($asset) {
+            $zipPath = Join-Path $env:TEMP ('mingw-xpack-' + [guid]::NewGuid().ToString('N') + '.zip')
+            if (-not (Test-Path -LiteralPath (Split-Path -Parent $toolsRoot))) {
+                New-Item -ItemType Directory -Path (Split-Path -Parent $toolsRoot) | Out-Null
+            }
+            if (-not (Test-Path -LiteralPath $toolsRoot)) {
+                New-Item -ItemType Directory -Path $toolsRoot | Out-Null
+            }
+            Invoke-WebRequest -Headers @{ 'User-Agent'='CyberBuilder-Installer' } -Uri $asset.browser_download_url -OutFile $zipPath -UseBasicParsing
+            Expand-Archive -LiteralPath $zipPath -DestinationPath $toolsRoot -Force
+            Remove-Item -LiteralPath $zipPath -Force -ErrorAction SilentlyContinue
+
+            $compiler = Get-ChildItem -Path $toolsRoot -Recurse -File -Filter 'x86_64-w64-mingw32-gcc.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($compiler) {
+                $binDir = Split-Path -Parent $compiler.FullName
+                if ($env:Path -notlike "*$binDir*") { $env:Path = "$binDir;$env:Path" }
+                return
+            }
+        }
+    } catch {
+        Write-Host 'GitHub MinGW install failed; falling back to package managers...' -ForegroundColor Yellow
+    }
+
+    if (Test-Command -Name 'scoop') {
+        Write-Host 'Installing GCC (MinGW) via Scoop for luarocks builds...' -ForegroundColor Cyan
+        try { scoop install gcc } catch { try { scoop update gcc } catch { } }
+    } elseif (Test-Command -Name 'winget') {
+        Write-Host 'Installing GCC (MinGW) via winget for luarocks builds...' -ForegroundColor Cyan
+        try { winget install --id BrechtSanders.WinLibs.POSIX.UCRT --source winget --accept-package-agreements --accept-source-agreements } catch { }
+    }
+}
+
+function Test-LfsAvailable {
+    param([Parameter(Mandatory = $true)][string] $LuaExe)
+    try {
+        & $LuaExe -e "local ok = pcall(require, 'lfs'); if ok then os.exit(0) else os.exit(2) end" | Out-Null
+        return ($LASTEXITCODE -eq 0)
+    } catch {
+        return $false
+    }
+}
+
+function Get-LuaDirFromExe {
+    param([Parameter(Mandatory = $true)][string] $LuaExe)
+    try {
+        if ($LuaExe -like '*\scoop\shims\lua.exe') {
+            $scoopLua = Join-Path $env:USERPROFILE 'scoop\apps\lua\current'
+            if (Test-Path -LiteralPath $scoopLua) { return $scoopLua }
+        }
+        $binDir = Split-Path -Parent $LuaExe
+        return (Split-Path -Parent $binDir)
+    } catch {
+        return $null
+    }
+}
+
+function Configure-LuaRocksRuntimePaths {
+    $rocksRoot = Join-Path $env:APPDATA 'luarocks'
+    $shareDir = Join-Path $rocksRoot 'share\lua\5.4'
+    $libDir = Join-Path $rocksRoot 'lib\lua\5.4'
+    $pathParts = @("$shareDir\?.lua", "$shareDir\?\init.lua")
+    $cpathParts = @("$libDir\?.dll")
+
+    if ($env:LUA_PATH) { $pathParts += $env:LUA_PATH }
+    if ($env:LUA_CPATH) { $cpathParts += $env:LUA_CPATH }
+
+    $env:LUA_PATH = ($pathParts -join ';')
+    $env:LUA_CPATH = ($cpathParts -join ';')
+}
+
 $links = [ordered]@{
     'Lua downloads' = 'https://www.lua.org/download.html'
     'LuaRocks'      = 'https://luarocks.org/'
+    'LuaFileSystem GitHub' = 'https://github.com/lunarmodules/luafilesystem'
 }
 
 if (-not $RepoRoot) {
@@ -308,26 +436,38 @@ if ($luaMissing -or $luaOutdated -or $InstallMode -eq 'Fresh') {
 }
 
 if (-not $luaExe) {
+    Write-DependencyCheckOutput -Name 'lua' -Found $false -VersionUnknown $false -InstallPath ''
+    Write-DependencyCheckOutput -Name 'lfs' -Found $false -VersionUnknown $false -InstallPath ''
     throw 'Lua is required. Aborting.'
 }
 
 Write-Host ('Lua found: {0}' -f $luaExe) -ForegroundColor Green
+Configure-LuaRocksRuntimePaths
 
 if ($InstallLfs -or $InstallMode -eq 'Fresh') {
     if (-not (Test-Command -Name 'luarocks')) {
-        Write-Host 'LuaRocks not found. Please install LuaRocks, then rerun.' -ForegroundColor Yellow
-        Write-Host ("  Link: {0}" -f $links['LuaRocks']) -ForegroundColor DarkGray
-    } else {
-        Write-Host 'Installing/updating luafilesystem (lfs) via luarocks...' -ForegroundColor Cyan
-        try {
-            luarocks install luafilesystem
-        } catch {
-            try {
-                luarocks update luafilesystem
-            } catch {
-                Write-Host 'luarocks failed to install/update luafilesystem. You may need a compiler toolchain for your Lua build.' -ForegroundColor Yellow
-            }
+        Install-OrUpdateLuaRocks
+    }
+    if (Test-Command -Name 'luarocks') {
+        Install-OrUpdateCCompiler
+        if (Test-Command -Name 'x86_64-w64-mingw32-gcc') { $env:CC = 'x86_64-w64-mingw32-gcc' }
+        elseif (Test-Command -Name 'gcc') { $env:CC = 'gcc' }
+        $luaDir = Get-LuaDirFromExe -LuaExe $luaExe
+        $lfsGithubRockspec = 'https://raw.githubusercontent.com/lunarmodules/luafilesystem/master/luafilesystem-scm-1.rockspec'
+        Write-Host 'Installing/updating luafilesystem (lfs) from GitHub via luarocks...' -ForegroundColor Cyan
+        try { luarocks --lua-version 5.4 --lua-dir $luaDir install $lfsGithubRockspec } catch { }
+        try { luarocks --lua-version 5.4 --lua-dir $luaDir make $lfsGithubRockspec } catch { }
+        if (-not (Test-LfsAvailable -LuaExe $luaExe)) {
+            Write-Host 'GitHub lfs install did not produce a loadable module, trying LuaRocks registry fallback...' -ForegroundColor Yellow
+            try { luarocks --lua-version 5.4 --lua-dir $luaDir install luafilesystem --force } catch { }
         }
+        if (-not (Test-LfsAvailable -LuaExe $luaExe)) {
+            Write-Host 'luarocks failed to install/update luafilesystem. You may need a compiler toolchain for your Lua build.' -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host 'LuaRocks not found after auto-install attempt. Please install LuaRocks, then rerun.' -ForegroundColor Yellow
+        Write-Host ("  Link: {0}" -f $links['LuaRocks']) -ForegroundColor DarkGray
+        Write-Host ("  GitHub: {0}" -f $links['LuaFileSystem GitHub']) -ForegroundColor DarkGray
     }
 }
 
@@ -338,6 +478,11 @@ try {
     if ($LASTEXITCODE -eq 0) { $lfsOk = $true }
 } catch { }
 Write-Host ("lfs available = {0}" -f $lfsOk) -ForegroundColor $(if ($lfsOk) { 'Green' } else { 'DarkYellow' })
+$luaVersionUnknown = [bool]($luaExe -and -not $luaVersion)
+$lfsVersionUnknown = [bool]$lfsOk
+$lfsInstallPath = if ($lfsOk -and (Test-Command -Name 'luarocks')) { 'luarocks:luafilesystem' } else { '' }
+Write-DependencyCheckOutput -Name 'lua' -Found $true -VersionUnknown $luaVersionUnknown -InstallPath $luaExe
+Write-DependencyCheckOutput -Name 'lfs' -Found $lfsOk -VersionUnknown $lfsVersionUnknown -InstallPath $lfsInstallPath
 
 if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot 'src\cyber_builder\init.lua'))) {
     throw "RepoRoot does not look like CyberBuilder: missing src\\cyber_builder\\init.lua at $RepoRoot"

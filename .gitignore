@@ -9,13 +9,22 @@ Thumbs.db
 
 # Logs and temp
 *.log
+logs/
 *.tmp
 *.temp
+temp-exports/
 
 # Build/output
 dist/
 build/
 out/
 
+# Local game path config
+config/local-game-path*.json
+*.gamepath.local.json
+
 # Project-local payloads (must stay untracked)
 distr/*
+
+# Local toolchains/downloaded compilers
+tools/

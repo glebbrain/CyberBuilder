@@ -12,6 +12,8 @@ CyberBuilder install scripts now use a unified behavior on all supported OS targ
 - **Best-effort CET install** when `InstallCET`/`--install-cet` is requested (or with fresh mode in orchestrators).
 - **Backup mod-touched game files by default before install** (can be disabled with explicit `NoBackupBeforeInstall` flags in script-specific options).
 - **Dependency installation is opt-in**: use `-InstallDeps` / `--install-deps` (or `Fresh` mode) to allow Lua/LuaRocks/lfs install attempts.
+- `lfs` install now prefers GitHub source (`lunarmodules/luafilesystem` rockspec) with LuaRocks registry fallback.
+- Windows `lfs` build path now also tries to install MinGW-w64 (`x86_64-w64-mingw32-gcc`) from GitHub releases (`xpack-dev-tools/mingw-w64-gcc-xpack`) before package-manager fallback.
 - **Prereqs strict mode is enabled by default**: prereqs scripts attempt full mod-stack installation (GitHub components auto, Nexus World Builder semi-manual) and fail with non-zero exit if any required component is missing.
 - In Windows strict mode, `WolvenKit` install is auto-attempted via `winget`, then via GitHub zip fallback to `%LOCALAPPDATA%\\WolvenKit`.
 - Missing payloads can be dropped into `distr` (for example `distr\\World Builder`); prereqs scripts scan all `distr` subfolders and `.zip` archives, install missing files, update older files, and skip conflicts safely.
@@ -59,6 +61,28 @@ Root orchestrators already follow this sequence automatically.
 
 - `MacOS/Install-CyberBuilderPrereqs.sh`
 - `MacOS/Install-CyberBuilder.ps1`
+
+## What each install script does
+
+- `Silent/Install-CyberBuilder-Silent.ps1` and `Silent/Install-CyberBuilder-Silent.sh`  
+  Orchestrate end-to-end install flow (prereqs phase then CyberBuilder runtime phase) with OS-aware routing.
+- `Install-CyberBuilder-WithBackup.ps1` and `Install-CyberBuilder-WithBackup.sh`  
+  Wrapper entrypoints that enforce backup-first behavior before running install flow.
+- `Windows10x64/Install-CyberBuilderPrereqs.ps1` and `Windows11x64/Install-CyberBuilderPrereqs.ps1`  
+  Check/install CP2077 mod-stack prerequisites and verify required components.
+- `Windows10x64/Install-CyberBuilder.ps1`, `Windows11x64/Install-CyberBuilder.ps1`, and `MacOS/Install-CyberBuilder.ps1`  
+  Validate CyberBuilder runtime prerequisites (Lua and optional lfs toolchain) and run dry-run checks.
+- `MacOS/Install-CyberBuilderPrereqs.sh`  
+  macOS prereqs checker/installer for CP2077 mod-stack dependencies.
+
+## What install scripts must not modify
+
+- Must not modify original game executable files or base game archives.
+- Must not modify quest/NPC/vehicle/world state or spawn/place/delete game objects.
+- Must not write outside this repo except:
+  - explicit game/mod directories selected for dependency installation, and
+  - backup targets configured by backup options.
+- Must not overwrite existing plugin folders without backup-first behavior or explicit opt-out flags.
 
 ## Quick commands
 
@@ -166,6 +190,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install\Silent\Ins
 - In strict prereqs mode, unresolved components become hard failures after install attempts and final verification.
 - Version compatibility for RED4ext / redscript must match the installed game patch.
 - Dependency updates are best effort and depend on available package managers (`winget`, `brew`, `luarocks`).
+- LuaFileSystem source: [lunarmodules/luafilesystem](https://github.com/lunarmodules/luafilesystem).
 - CyberBuilder scripts do not replace upstream mod installers; they orchestrate checks and local runtime readiness.
 - Linux is currently unsupported by these install orchestrators; use Windows/macOS scripts or run runtime steps manually.
 

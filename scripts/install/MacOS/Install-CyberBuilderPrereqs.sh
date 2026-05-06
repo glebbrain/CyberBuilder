@@ -28,6 +28,7 @@ GAME_PATH=""
 OPEN_DOCUMENTATION_LINKS=false
 JSON_MODE=false
 BACKUP_BEFORE_INSTALL=true
+CONFIRM_PLUGIN_OVERWRITE=false
 BACKUP_ROOT="${HOME}/Documents/CyberBuilder-CP2077-backups"
 INSTALL_CET=false
 STRICT_INSTALL=true
@@ -49,6 +50,7 @@ Options:
   --backup-before-install       Copy mod-related hotspots to backup folder (default)
   --no-backup-before-install    Disable backup before install
   --backup-root <path>          Parent backup directory (default: ~/Documents/CyberBuilder-CP2077-backups)
+  --confirm-plugin-overwrite    Allow plugin folder overwrite when backup is disabled
   --install-cet                 Best-effort CET install from latest GitHub release
   --strict-install              Enforce full stack verification and fail if any component missing (default)
   --no-strict-install           Disable strict full stack enforcement
@@ -92,6 +94,10 @@ while [[ $# -gt 0 ]]; do
       [[ $# -lt 2 ]] && { echo "Missing value for --backup-root" >&2; exit 1; }
       BACKUP_ROOT="$2"
       shift 2
+      ;;
+    --confirm-plugin-overwrite)
+      CONFIRM_PLUGIN_OVERWRITE=true
+      shift
       ;;
     --install-cet)
       INSTALL_CET=true
@@ -445,6 +451,12 @@ PY
   fi
 
   ensure_dir "${game_root}/bin/x64/plugins"
+  if ! $BACKUP_BEFORE_INSTALL && ! $CONFIRM_PLUGIN_OVERWRITE && [[ -d "${game_root}/bin/x64/plugins/cyber_engine_tweaks" ]]; then
+    echo "Safe-mode: refusing to overwrite existing plugin folder without backup or --confirm-plugin-overwrite." >&2
+    CET_INSTALL_STATUS="safe_mode_blocked"
+    rm -rf "$extract_dir" "$zip_path"
+    return 0
+  fi
   rm -rf "${game_root}/bin/x64/plugins/cyber_engine_tweaks"
   cp -R "$plugin_dir" "${game_root}/bin/x64/plugins/cyber_engine_tweaks"
 
@@ -502,6 +514,10 @@ PY
   ensure_dir "$extract_dir"
   curl -fsSL "$zip_url" -o "$zip_path" || { rm -rf "$extract_dir" "$zip_path"; return 1; }
   unzip -oq "$zip_path" -d "$extract_dir" || { rm -rf "$extract_dir" "$zip_path"; return 1; }
+  if ! $BACKUP_BEFORE_INSTALL && ! $CONFIRM_PLUGIN_OVERWRITE && [[ -d "${game_root}/bin/x64/plugins" ]]; then
+    rm -rf "$extract_dir" "$zip_path"
+    return 1
+  fi
   cp -R "${extract_dir}/." "$game_root/" || { rm -rf "$extract_dir" "$zip_path"; return 1; }
   rm -rf "$extract_dir" "$zip_path"
   return 0

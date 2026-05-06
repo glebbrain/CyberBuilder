@@ -60,6 +60,8 @@ param(
 
     [switch] $NoBackupBeforeInstall,
 
+    [switch] $ConfirmPluginOverwrite,
+
     [Parameter(Mandatory = $false)]
     [string] $BackupRoot,
 
@@ -359,6 +361,9 @@ function Install-CetFromGitHub {
             New-Item -ItemType Directory -Force -Path $pluginsRoot | Out-Null
         }
         $target = Join-Path $pluginsRoot 'cyber_engine_tweaks'
+        if ($NoBackupBeforeInstall -and -not $ConfirmPluginOverwrite -and (Test-Path -LiteralPath $target)) {
+            throw 'Safe-mode: refusing to overwrite existing plugin folder without backup or -ConfirmPluginOverwrite.'
+        }
         if (Test-Path -LiteralPath $target) {
             Remove-Item -LiteralPath $target -Recurse -Force
         }
@@ -418,6 +423,10 @@ function Install-GitHubZipComponent {
             throw "$ComponentName install: archive is empty."
         }
 
+        $pluginsRoot = Join-Path $GameRoot 'bin\x64\plugins'
+        if ($NoBackupBeforeInstall -and -not $ConfirmPluginOverwrite -and (Test-Path -LiteralPath $pluginsRoot)) {
+            throw "Safe-mode: refusing component install for $ComponentName because plugin folders may be overwritten without backup or -ConfirmPluginOverwrite."
+        }
         foreach ($entry in $topEntries) {
             Copy-Item -LiteralPath $entry.FullName -Destination $GameRoot -Recurse -Force
         }

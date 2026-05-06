@@ -1,6 +1,6 @@
-# CyberBuilder (Pack Registry MVP)
+# CyberBuilder (v0.2 Catalog)
 
-CyberBuilder validates **JSON packs** under `packs/*` and exports **World Builder–compatible** path lists into the project `dist/` tree. It does **not** spawn, scan, or edit objects in the Cyberpunk 2077 world; use **World Builder** (or another consumer of the `.txt` exports) for in-world work.
+CyberBuilder validates **JSON packs** under `packs/*`, builds a **catalog snapshot** for safe browsing, and exports **World Builder-compatible** path lists into `dist/`. It does **not** spawn, scan, or edit objects in the Cyberpunk 2077 world; use **World Builder** (or another consumer of the `.txt` exports) for in-world placement.
 
 ## Requirements
 
@@ -38,6 +38,23 @@ Automated checks for registry, validation, and export helpers:
 lua tests/run_pack_registry_tests.lua
 ```
 
+## v0.2 Usage Flow
+
+1. Add or edit packs under `packs/<pack_id>/` (`pack.json`, `objects.json`, `recipes.json`).
+2. Run build pipeline from repo root:
+   - `scripts/build/clean.ps1`
+   - `scripts/build/build.ps1`
+3. Verify generated outputs:
+   - `dist/cyberbuilder_catalog.json`
+   - `dist/cyberbuilder_export_summary.json`
+   - `dist/cyberbuilder_errors.log`
+4. Open CET catalog UI and browse:
+   - filter by category;
+   - inspect object metadata;
+   - copy selected `resourcePath`;
+   - export selected object path to `dist/worldbuilder/selected/`.
+5. Use exported `.txt` files in World Builder for actual spawning/placement.
+
 ## Documentation
 
 | Doc | Purpose |
@@ -60,9 +77,9 @@ lua tests/run_pack_registry_tests.lua
 - `World Builder`: [Nexus Mods](https://www.nexusmods.com/cyberpunk2077/mods/20660)
 - `WolvenKit`: [GitHub Releases](https://github.com/WolvenKit/WolvenKit/releases)
 
-## Known limitations (MVP)
+## Known limitations (v0.2)
 
-- **No in-game catalog or placement** from this repo alone; exports target World Builder–style layouts under `dist/`.
+- **No in-game placement** from this repo alone; v0.2 UI is browse-only and exports paths for World Builder.
 - **Invalid packs are skipped** with errors logged; they do not stop other packs from exporting.
 - **`ignoredPackIds`** in config excludes pack folders from processing (the repo ships `broken_example_pack` as intentionally broken test data—remove its id from the list only when you want to exercise failures).
 - **Resource paths** are not verified against the real game; you must supply correct `resourcePath` values yourself (`docs/SAFETY_RULES.md`, `.manager/ruls.md`).

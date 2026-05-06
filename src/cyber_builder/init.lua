@@ -65,6 +65,8 @@ local function load_merged_config(config_path)
   local config = {
     packsDir = path_utils.join(root, "packs"),
     distDir = path_utils.join(root, "dist"),
+    uiEnabled = false,
+    catalogHotkey = "F8",
     ignoredPackIds = { ["broken_example_pack"] = true },
     logging = {
       level = DEFAULT_LOGGING.level,
@@ -97,6 +99,12 @@ local function load_merged_config(config_path)
   end
   if type(data.worldBuilderSpawnablesDir) == "string" and data.worldBuilderSpawnablesDir ~= "" then
     config.worldBuilderSpawnablesDir = data.worldBuilderSpawnablesDir
+  end
+  if type(data.uiEnabled) == "boolean" then
+    config.uiEnabled = data.uiEnabled
+  end
+  if type(data.catalogHotkey) == "string" and data.catalogHotkey ~= "" then
+    config.catalogHotkey = data.catalogHotkey
   end
   if type(data.ignoredPackIds) == "table" then
     config.ignoredPackIds = {}
