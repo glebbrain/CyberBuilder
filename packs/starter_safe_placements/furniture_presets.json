@@ -1,0 +1,26 @@
+[
+  {
+    "id": "chair_basic_01",
+    "name": "Starter Chair",
+    "packId": "starter_furniture",
+    "objectId": "chair_basic_01",
+    "tags": ["buildable", "safe", "decor", "static", "owned"],
+    "transform": {
+      "position": { "x": 0, "y": 0, "z": 0 },
+      "rotation": { "pitch": 0, "yaw": 0, "roll": 0 },
+      "scale": 1.0
+    }
+  },
+  {
+    "id": "table_basic_01",
+    "name": "Starter Table",
+    "packId": "starter_furniture",
+    "objectId": "table_basic_01",
+    "tags": ["buildable", "safe", "decor", "static", "owned"],
+    "transform": {
+      "position": { "x": 1.0, "y": 0, "z": 0 },
+      "rotation": { "pitch": 0, "yaw": 90, "roll": 0 },
+      "scale": 1.0
+    }
+  }
+]

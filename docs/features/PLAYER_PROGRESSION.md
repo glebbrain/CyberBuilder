@@ -58,3 +58,7 @@ v0.3 progression does not include:
 - multiplayer synchronization.
 
 Progression only prepares safe, gameplay-facing authorization and browsing behavior.
+
+---
+
+Last reviewed: 2026-05-07.

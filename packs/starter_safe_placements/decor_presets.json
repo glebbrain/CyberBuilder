@@ -1,0 +1,26 @@
+[
+  {
+    "id": "poster_neon_01",
+    "name": "Starter Neon Poster",
+    "packId": "starter_furniture",
+    "objectId": "poster_neon_01",
+    "tags": ["buildable", "safe", "decor", "static", "owned"],
+    "transform": {
+      "position": { "x": 0, "y": 1.8, "z": 0 },
+      "rotation": { "pitch": 0, "yaw": 0, "roll": 0 },
+      "scale": 1.0
+    }
+  },
+  {
+    "id": "plant_pot_01",
+    "name": "Starter Potted Plant",
+    "packId": "starter_furniture",
+    "objectId": "plant_pot_01",
+    "tags": ["buildable", "safe", "decor", "static", "owned"],
+    "transform": {
+      "position": { "x": 0.5, "y": 0, "z": 0.5 },
+      "rotation": { "pitch": 0, "yaw": 45, "roll": 0 },
+      "scale": 1.0
+    }
+  }
+]

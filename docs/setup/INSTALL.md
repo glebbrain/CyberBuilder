@@ -126,3 +126,7 @@ Allow dependency installation attempts:
 - CyberBuilder MVP **does not** replace game mod dependencies; it validates JSON packs and exports World Builder-oriented outputs.
 - Dependency installation is opt-in: pass `-InstallDeps` / `--install-deps` (or use `Fresh` mode) to allow Lua/LuaRocks/lfs install attempts.
 - Linux is currently unsupported by install orchestrators in this repository.
+
+---
+
+Last reviewed: 2026-05-07.

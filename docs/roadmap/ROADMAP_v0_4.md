@@ -42,3 +42,23 @@ Minimum v0.4 test expectations:
 ## Exit Criteria
 v0.4 is considered complete when placement handoff is safety-gated, deterministic, and strictly limited to CyberBuilder-authorized safe objects with no direct unsafe world editing.
 
+## Actual v0.4 Validation Snapshot
+- `tests/run_pack_registry_tests.lua`: fails with 1 failing test in placement removal metadata path (`placement ownership not found` in `placement_removal_service.mark_removed` test case).
+- `scripts/build/clean.ps1`: passes.
+- `scripts/build/build.ps1`: passes.
+- rerun `scripts/build/build.ps1` (determinism check): passes.
+
+## Actual v0.4 Limitations
+- Placement wrapper remains metadata/validation focused and is not a full world editor.
+- Placement/removal behavior still depends on provider integration boundaries (for example World Builder hand-off), not direct in-engine object mutation from CyberBuilder.
+- Scope remains single-player safe metadata ownership tracking; multiplayer/runtime synchronization is not implemented.
+- Forbidden categories/tags and original world object safety restrictions remain hard boundaries.
+
+## Remaining Risks
+- Current validation run has one failing placement-removal test, so placement removal safety assertions are not fully green in the automated suite. The failure occurs because the test registers ownership in one `placement_ownership_service` instance while `placement_removal_service` loads its own instance via internal `dofile` (see `docs/PLACEMENT_WRAPPER.md`, `docs/OWNERSHIP_RULES.md`).
+- Existing tests are unit-style coverage; there is still risk in end-to-end orchestration across authorization -> wrapper -> provider hand-off.
+
+---
+
+Last reviewed: 2026-05-07.
+

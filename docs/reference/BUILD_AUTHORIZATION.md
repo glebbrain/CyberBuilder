@@ -77,3 +77,7 @@ The authorization model is designed to support future fields without weakening s
 - dependency metadata for DLC/community/faction constraints.
 
 Future extensions must remain backward-compatible with existing safe authorization behavior.
+
+---
+
+Last reviewed: 2026-05-07.

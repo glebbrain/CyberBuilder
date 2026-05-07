@@ -31,3 +31,6 @@ This list matches the project rule set in **`.manager/ruls.md`**: the MVP **must
 
 For acceptance criteria and CI expectations, see **`.manager/dod.md`** and **`.manager/ci-gate.md`**.
 
+---
+
+Last reviewed: 2026-05-07.

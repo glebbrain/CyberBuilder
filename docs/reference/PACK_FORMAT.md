@@ -48,3 +48,6 @@ Top-level value: **JSON array** of recipe records. Each recipe must reference an
 For install prerequisites and MVP boundaries, see `docs/README.md` and `docs/setup/INSTALL.md`.
 For the World Builder dependency page, see [Nexus Mods](https://www.nexusmods.com/cyberpunk2077/mods/20660).
 
+---
+
+Last reviewed: 2026-05-07.

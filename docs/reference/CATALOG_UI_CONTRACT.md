@@ -73,3 +73,7 @@ Catalog entry ordering should remain deterministic to avoid UI flicker and incon
 This contract is for browse/authorize flow only in v0.3.
 
 It does not grant placement/spawn permissions and does not imply world-edit actions.
+
+---
+
+Last reviewed: 2026-05-07.

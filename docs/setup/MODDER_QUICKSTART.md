@@ -62,6 +62,15 @@ lua src/cyber_builder/init.lua --log-level=DEBUG --log-targets=console,files --l
 
 On success, check **`dist/`** for generated World Builder–oriented exports, **`dist/cyberbuilder_errors.log`**, and **`dist/cyberbuilder_export_summary.json`**. Fix any errors reported for your pack id; invalid packs are skipped so other packs can still export.
 
+### Alternative: build scripts (Windows)
+
+From the repository root in PowerShell:
+
+```powershell
+.\scripts\build\clean.ps1
+.\scripts\build\build.ps1
+```
+
 ## Where to read next
 
 - **`docs/reference/PACK_FORMAT.md`** — field-by-field format.
@@ -69,3 +78,6 @@ On success, check **`dist/`** for generated World Builder–oriented exports, **
 - **`docs/setup/INSTALL.md`** — dependency stack setup and install scripts.
 - **World Builder page** — [Nexus Mods](https://www.nexusmods.com/cyberpunk2077/mods/20660).
 
+---
+
+Last reviewed: 2026-05-07.

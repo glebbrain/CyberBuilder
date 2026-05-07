@@ -15,11 +15,19 @@ In-game or companion UI to browse validated packs and objects (read-only catalog
 
 Gameplay-facing layer to select and authorize buildable items from the catalog (still bounded by MVP safety rules in `docs/reference/SAFETY_RULES.md` and `.manager/ruls.md`).
 
-## v0.4 — Placement Wrapper
+## v0.4 — Placement Wrapper (implemented in code and schemas)
 
-Controlled bridge toward placement or hand-off to World Builder (or similar tools), without duplicating full world editing or violating the no–game-world-node edit bar for unsupported categories.
+Controlled bridge from Construction Chip authorization to placement via World Builder (or compatible providers), without editing base world nodes. Plan, actual validation snapshot, limits, and risks: `docs/roadmap/ROADMAP_v0_4.md`.
 
-## v0.5 — Scanner
+## v0.5 — Scanner Blueprint Integration (planned)
 
-Optional scanner-style discovery of **safe** build props for catalog hints only—explicitly not NPC, vehicle, quest, combat, or other blacklisted targets; see `docs/reference/SAFETY_RULES.md`.
+Optional discovery of **safe** build props for catalog hints and blueprints—not NPCs, vehicles, quests, etc.; see `docs/roadmap/ROADMAP_v0_5.md` and `docs/reference/SAFETY_RULES.md`.
+
+## v0.6 — Workshop / Crafting (planned)
+
+See `docs/ROADMAP_v0_6.md`—workshop/crafting integration on top of validated data, without unsafe world editing.
+
+---
+
+Last reviewed: 2026-05-07.
 

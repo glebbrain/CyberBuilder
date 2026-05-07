@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlacementResult",
+  "type": "object",
+  "properties": {
+    "requestId": { "type": "string" },
+    "sessionId": { "type": "string" },
+    "placementId": { "type": "string" },
+    "provider": { "type": "string" },
+    "state": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "validated",
+        "delegated",
+        "placed",
+        "failed",
+        "removed"
+      ]
+    },
+    "success": { "type": "boolean" },
+    "errorCode": { "type": "string" },
+    "errorMessage": { "type": "string" },
+    "timestamp": { "type": "string" }
+  },
+  "required": [
+    "requestId",
+    "sessionId",
+    "provider",
+    "state",
+    "success",
+    "timestamp"
+  ],
+  "additionalProperties": false
+}

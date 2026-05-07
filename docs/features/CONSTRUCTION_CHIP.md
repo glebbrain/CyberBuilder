@@ -58,3 +58,7 @@ The Construction Chip establishes foundation data for future versions:
 - future dependency metadata (DLC/community/faction ownership extensions).
 
 Future roadmap work must preserve core safety boundaries: no unsafe categories in gameplay UI and no direct world editing by this module.
+
+---
+
+Last reviewed: 2026-05-07.

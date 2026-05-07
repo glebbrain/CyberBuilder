@@ -16,9 +16,12 @@ local schema_validator = dofile(dir .. "schema_validator.lua")
 local worldbuilder_exporter = dofile(dir .. "worldbuilder_exporter.lua")
 
 local construction_chip_dir = path_utils.join(dir, "construction_chip")
+local placement_wrapper_dir = path_utils.join(dir, "placement_wrapper")
 local build_authorizer = dofile(path_utils.join(construction_chip_dir, "build_authorizer.lua"))
 local player_progression = dofile(path_utils.join(construction_chip_dir, "player_progression.lua"))
 local chip_load_service = dofile(path_utils.join(construction_chip_dir, "chip_load_service.lua"))
+local placement_session_log_service = dofile(path_utils.join(placement_wrapper_dir, "placement_session_log_service.lua"))
+local construction_chip_facade = dofile(path_utils.join(construction_chip_dir, "init.lua"))
 
 --- Dependencies that are not other pack ids (tooling / runtime capabilities).
 local VIRTUAL_PACK_DEPS = {
@@ -44,10 +47,11 @@ end
 
 local DEFAULT_LOGGING = {
   level = "INFO",
-  targets = { "console" },
+  targets = { "console", "files" },
   mainFileName = "cyberbuilder.log",
   errorFileName = "cyberbuilder_errors.log",
   externalEnabled = false,
+  mirrorWarnToErrorFile = false,
 }
 
 local function repo_root()
@@ -87,7 +91,9 @@ local function count_export_eligible_objects(objects)
   return n
 end
 
-local function load_merged_config(config_path)
+--- `config_flags` optional: set `missing_config_file = true` when defaults are used (no JSON file).
+local function load_merged_config(config_path, config_flags)
+  config_flags = type(config_flags) == "table" and config_flags or {}
   local root = repo_root()
   local config = {
     packsDir = path_utils.join(root, "packs"),
@@ -101,19 +107,13 @@ local function load_merged_config(config_path)
       mainFileName = DEFAULT_LOGGING.mainFileName,
       errorFileName = DEFAULT_LOGGING.errorFileName,
       externalEnabled = DEFAULT_LOGGING.externalEnabled,
+      mirrorWarnToErrorFile = DEFAULT_LOGGING.mirrorWarnToErrorFile,
     },
   }
   local data, err = json_loader.read(config_path)
   if not data then
     if err and err:find("cannot open", 1, true) then
-      logger.info(
-        string.format(
-          "no config file at %q — using defaults packsDir=%q distDir=%q",
-          config_path,
-          config.packsDir,
-          config.distDir
-        )
-      )
+      config_flags.missing_config_file = true
       return config, nil
     end
     return nil, err
@@ -165,6 +165,11 @@ local function load_merged_config(config_path)
     end
     if type(incoming.externalEnabled) == "boolean" then
       config.logging.externalEnabled = incoming.externalEnabled
+    end
+    if incoming.mirrorWarnToErrorFile == true then
+      config.logging.mirrorWarnToErrorFile = true
+    elseif incoming.mirrorWarnToErrorFile == false then
+      config.logging.mirrorWarnToErrorFile = false
     end
   end
   return config, nil
@@ -316,9 +321,6 @@ end
 function cyber_builder.run(opts)
   opts = type(opts) == "table" and opts or {}
   local dry_run = opts.dryRun == true
-  if dry_run then
-    logger.info("dry-run: no export files or install copies will be written")
-  end
   local err_log = {}
   local config = nil
   local stats = nil
@@ -418,7 +420,8 @@ function cyber_builder.run(opts)
 
   local config_path = opts.configPath or path_utils.join(repo_root(), "cyberbuilder.config.json")
   local cerr
-  config, cerr = load_merged_config(config_path)
+  local cfg_flags = {}
+  config, cerr = load_merged_config(config_path, cfg_flags)
   if not config then
     emit_error(tostring(cerr), "CFG_LOAD", { stage = "config_load", file = config_path })
     return false, cerr
@@ -426,20 +429,6 @@ function cyber_builder.run(opts)
 
   local logging_cfg = type(config.logging) == "table" and config.logging or {}
   local cli_targets = type(opts.logTargets) == "table" and opts.logTargets or nil
-  logger.configure({
-    level = opts.logLevel or logging_cfg.level or DEFAULT_LOGGING.level,
-    targets = cli_targets or logging_cfg.targets or DEFAULT_LOGGING.targets,
-    context = { stage = "bootstrap" },
-    externalHandler = (logging_cfg.externalEnabled == true and opts.externalLogHandler) and opts.externalLogHandler or nil,
-  })
-  logger.info(
-    string.format(
-      "logging configured level=%s targets=%s",
-      tostring(opts.logLevel or logging_cfg.level or DEFAULT_LOGGING.level),
-      table.concat(cli_targets or logging_cfg.targets or DEFAULT_LOGGING.targets, ",")
-    ),
-    { stage = "config_load", file = config_path }
-  )
 
   local repo = repo_root()
   local safe_dist, serr = enforce_safe_dist_dir(repo, config.distDir)
@@ -448,14 +437,6 @@ function cyber_builder.run(opts)
     return false, serr
   end
   config.distDir = safe_dist
-
-  build_authorizer.clear_cache()
-  local saves_dir = path_utils.join(repo, "saves")
-  local unlock_data, unlock_note = chip_load_service.load_unlock_state_with_fallback(saves_dir)
-  if unlock_note then
-    logger.info("[ConstructionChip] " .. unlock_note, { stage = "unlock_load" })
-  end
-  player_progression.apply_chip_unlock_data(unlock_data)
 
   logger.configure({
     level = opts.logLevel or logging_cfg.level or DEFAULT_LOGGING.level,
@@ -470,7 +451,45 @@ function cyber_builder.run(opts)
       logging_cfg.errorFileName or DEFAULT_LOGGING.errorFileName
     ),
     externalHandler = (logging_cfg.externalEnabled == true and opts.externalLogHandler) and opts.externalLogHandler or nil,
+    mirrorWarnToErrorFile = logging_cfg.mirrorWarnToErrorFile == true,
   })
+
+  if cfg_flags.missing_config_file then
+    logger.info(
+      string.format(
+        "no config file at %q — using defaults packsDir=%q distDir=%q",
+        config_path,
+        config.packsDir,
+        config.distDir
+      ),
+      { stage = "config_load", file = config_path }
+    )
+  end
+
+  logger.info(
+    string.format(
+      "logging configured level=%s targets=%s mainFile=%s",
+      tostring(opts.logLevel or logging_cfg.level or DEFAULT_LOGGING.level),
+      table.concat(cli_targets or logging_cfg.targets or DEFAULT_LOGGING.targets, ","),
+      tostring(opts.logFileName or logging_cfg.mainFileName or DEFAULT_LOGGING.mainFileName)
+    ),
+    { stage = "config_load", file = config_path }
+  )
+
+  if dry_run then
+    logger.info("dry-run: no export files or install copies will be written")
+  end
+
+  placement_session_log_service.set_core_logger(logger)
+  construction_chip_facade.set_logger(logger)
+
+  build_authorizer.clear_cache()
+  local saves_dir = path_utils.join(repo, "saves")
+  local unlock_data, unlock_note = chip_load_service.load_unlock_state_with_fallback(saves_dir)
+  if unlock_note then
+    logger.info("[ConstructionChip] " .. unlock_note, { stage = "unlock_load" })
+  end
+  player_progression.apply_chip_unlock_data(unlock_data)
 
   stats = {
     packs_found = 0,

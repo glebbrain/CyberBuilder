@@ -23,6 +23,7 @@ local state = {
   main_file_path = nil,
   error_file_path = nil,
   external_handler = nil,
+  mirror_warn_to_error_file = false,
 }
 
 local function now_iso8601_utc()
@@ -161,7 +162,7 @@ local function emit(level, msg, local_ctx)
   end
   if state.targets.files and state.main_file_path then
     append_line(state.main_file_path, file_line)
-    if lvl == "ERROR" and state.error_file_path then
+    if state.error_file_path and (lvl == "ERROR" or (lvl == "WARN" and state.mirror_warn_to_error_file)) then
       append_line(state.error_file_path, file_line)
     end
   end
@@ -173,10 +174,14 @@ function logger.configure(opts)
   local level = normalize_level(opts.level or opts.min_level or "INFO")
   state.min_level = LEVEL_VALUE[level]
 
+  local TARGET_ALIASES = {
+    file = "files",
+  }
   local targets = {}
   if type(opts.targets) == "table" then
     for _, t in ipairs(opts.targets) do
       local key = trim(tostring(t)):lower()
+      key = TARGET_ALIASES[key] or key
       if VALID_TARGET[key] then
         targets[key] = true
       end
@@ -195,6 +200,7 @@ function logger.configure(opts)
   state.main_file_path = type(opts.mainFilePath) == "string" and trim(opts.mainFilePath) ~= "" and opts.mainFilePath or nil
   state.error_file_path = type(opts.errorFilePath) == "string" and trim(opts.errorFilePath) ~= "" and opts.errorFilePath or nil
   state.external_handler = type(opts.externalHandler) == "function" and opts.externalHandler or nil
+  state.mirror_warn_to_error_file = opts.mirrorWarnToErrorFile == true
 end
 
 function logger.with_context(ctx)

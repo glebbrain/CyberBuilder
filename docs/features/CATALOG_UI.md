@@ -48,3 +48,7 @@ The catalog UI must not:
 - implement crafting/economy/gameplay systems.
 
 The UI is intentionally limited to safe metadata browsing and safe export helpers under project `dist/`.
+
+---
+
+Last reviewed: 2026-05-07.

@@ -1,5 +1,7 @@
 # v0.3 Validation Report
 
+**Historical snapshot.** Reflects the repository at the time this report was written. As of 2026-05-07, the repo includes `scripts/build/clean.ps1` and Placement Wrapper v0.4; for the current v0.4 validation snapshot see `docs/roadmap/ROADMAP_v0_4.md`.
+
 ## Scope
 This report documents the actual validation status, current limitations, and remaining risks for Construction Chip v0.3 based on the required CI/testing gates.
 
@@ -33,3 +35,7 @@ This report documents the actual validation status, current limitations, and rem
 - Core Construction Chip validation tests pass.
 - Build pipeline executes successfully and writes expected logs/summary artifacts.
 - v0.3 still has concrete packaging/content limitations that should be addressed before treating release output as fully production-ready.
+
+---
+
+Last reviewed: 2026-05-07.

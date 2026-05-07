@@ -41,6 +41,14 @@ local chip_load_service = dofile(path_utils.join(cyber_dir, "construction_chip",
 local unlock_registry = dofile(path_utils.join(cyber_dir, "construction_chip", "unlock_registry.lua"))
 local catalog_projection = dofile(path_utils.join(cyber_dir, "construction_chip", "catalog_projection.lua"))
 local player_progression = dofile(path_utils.join(cyber_dir, "construction_chip", "player_progression.lua"))
+local placement_request_validator = dofile(path_utils.join(cyber_dir, "placement_wrapper", "placement_request_validator.lua"))
+local placement_ownership_service = dofile(path_utils.join(cyber_dir, "placement_wrapper", "placement_ownership_service.lua"))
+local placement_save_service = dofile(path_utils.join(cyber_dir, "placement_wrapper", "placement_save_service.lua"))
+local placement_load_service = dofile(path_utils.join(cyber_dir, "placement_wrapper", "placement_load_service.lua"))
+local placement_orphan_recovery_service = dofile(path_utils.join(cyber_dir, "placement_wrapper", "placement_orphan_recovery_service.lua"))
+local placement_provider_registry = dofile(path_utils.join(cyber_dir, "placement_wrapper", "placement_provider_registry.lua"))
+local placement_queue_service = dofile(path_utils.join(cyber_dir, "placement_wrapper", "placement_queue_service.lua"))
+local placement_removal_service = dofile(path_utils.join(cyber_dir, "placement_wrapper", "placement_removal_service.lua"))
 
 local failures = 0
 
@@ -638,6 +646,43 @@ do
   pcall(os.remove, path_utils.join(TEST_DIR, "_tmp_logger_warn_errors.log"))
 end
 
+-- logger: mirrorWarnToErrorFile duplicates WARN lines into error log
+do
+  local name = "logger.configure(mirrorWarnToErrorFile copies WARN to error file)"
+  local log_path = path_utils.join(TEST_DIR, "_tmp_logger_mirror_main.log")
+  local err_path = path_utils.join(TEST_DIR, "_tmp_logger_mirror_errors.log")
+  pcall(os.remove, log_path)
+  pcall(os.remove, err_path)
+  logger.configure({
+    level = "INFO",
+    targets = { "files" },
+    mainFilePath = log_path,
+    errorFilePath = err_path,
+    mirrorWarnToErrorFile = true,
+    context = {},
+  })
+  logger.info("info_only_main")
+  logger.warn("warn_in_both")
+  logger.error("error_in_both")
+  local main_f = io.open(log_path, "rb")
+  local main_body = main_f and main_f:read("*a") or ""
+  if main_f then
+    main_f:close()
+  end
+  local err_f = io.open(err_path, "rb")
+  local err_body = err_f and err_f:read("*a") or ""
+  if err_f then
+    err_f:close()
+  end
+  local ok_main = main_body:find("info_only_main", 1, true) and main_body:find("warn_in_both", 1, true) and main_body:find("error_in_both", 1, true)
+  local ok_err = not err_body:find("info_only_main", 1, true)
+    and err_body:find("warn_in_both", 1, true)
+    and err_body:find("error_in_both", 1, true)
+  assert_true(ok_main and ok_err, name, "expected WARN+ERROR in error file, INFO main only")
+  pcall(os.remove, log_path)
+  pcall(os.remove, err_path)
+end
+
 -- logger: context helper must append merged context fields
 do
   local name = "logger.with_context(merged context fields)"
@@ -997,6 +1042,338 @@ do
       tostring(err_dev)
     )
   )
+end
+
+-- placement_wrapper.placement_request_validator: unauthorized placement rejection
+do
+  local name = "placement_wrapper.placement_request_validator.validate_authorized_catalog_membership(rejects unauthorized)"
+  local request = {
+    packId = "starter_furniture",
+    objectId = "chair_missing_99",
+    globalId = "starter_furniture:chair_missing_99",
+  }
+  local authorized_entries = {
+    {
+      packId = "starter_furniture",
+      objectId = "chair_basic_01",
+      globalId = "starter_furniture:chair_basic_01",
+    },
+  }
+  local ok_auth, err_auth = placement_request_validator.validate_authorized_catalog_membership(request, authorized_entries)
+  local rejected = ok_auth == false
+    and type(err_auth) == "string"
+    and err_auth:find("not present in authorized build catalog", 1, true) ~= nil
+  assert_true(
+    rejected,
+    name,
+    string.format("expected unauthorized placement rejection, got ok=%s err=%s", tostring(ok_auth), tostring(err_auth))
+  )
+end
+
+-- placement_wrapper.placement_request_validator: denylist category rejection
+do
+  local name = "placement_wrapper.placement_request_validator.validate_category_denylist(rejects denylisted category)"
+  local ok_category, err_category = placement_request_validator.validate_category_denylist("NPC")
+  local rejected = ok_category == false
+    and type(err_category) == "string"
+    and err_category:find("matches placement denylist", 1, true) ~= nil
+  assert_true(
+    rejected,
+    name,
+    string.format("expected denylist category rejection, got ok=%s err=%s", tostring(ok_category), tostring(err_category))
+  )
+end
+
+-- placement_wrapper.placement_request_validator: disabled object placement rejection
+do
+  local name = "placement_wrapper.placement_request_validator.validate_not_disabled(rejects disabled object)"
+  local ok_disabled, err_disabled = placement_request_validator.validate_not_disabled({
+    id = "disabled_object_01",
+    disabled = true,
+  })
+  local rejected = ok_disabled == false
+    and type(err_disabled) == "string"
+    and err_disabled:find("disabled object", 1, true) ~= nil
+  assert_true(
+    rejected,
+    name,
+    string.format("expected disabled object rejection, got ok=%s err=%s", tostring(ok_disabled), tostring(err_disabled))
+  )
+end
+
+-- placement_wrapper.placement_request_validator: invalid transform rejection
+do
+  local name = "placement_wrapper.placement_request_validator.validate_transform_numeric_ranges(rejects invalid transform)"
+  local ok_transform, err_transform = placement_request_validator.validate_transform_numeric_ranges({
+    position = { x = 1, y = 2, z = "bad_z" },
+    rotation = { pitch = 0, yaw = 180, roll = 90 },
+    scale = 1,
+  })
+  local rejected = ok_transform == false
+    and type(err_transform) == "table"
+    and #err_transform > 0
+    and type(err_transform[1]) == "string"
+    and err_transform[1]:find("position.z: expected finite number", 1, true) ~= nil
+  assert_true(
+    rejected,
+    name,
+    string.format("expected invalid transform rejection, got ok=%s err=%s", tostring(ok_transform), tostring(err_transform))
+  )
+end
+
+-- placement_wrapper.placement_ownership_service: duplicate placement id handling
+do
+  local name = "placement_wrapper.placement_ownership_service.detect_duplicate_placement_id(rejects duplicate id)"
+  placement_ownership_service.reset()
+  local registered, register_err = placement_ownership_service.register({
+    placementId = "placement_dup_01",
+    ownerId = "player_01",
+    packId = "starter_furniture",
+    objectId = "chair_basic_01",
+    provider = "world_builder",
+  })
+  local is_dup, dup_err = placement_ownership_service.detect_duplicate_placement_id("placement_dup_01")
+  local rejected = registered ~= nil
+    and register_err == nil
+    and is_dup == true
+    and type(dup_err) == "string"
+    and dup_err:find("duplicate placement id detected", 1, true) ~= nil
+  assert_true(
+    rejected,
+    name,
+    string.format(
+      "expected duplicate placement id detection, got registered=%s register_err=%s is_dup=%s dup_err=%s",
+      tostring(registered),
+      tostring(register_err),
+      tostring(is_dup),
+      tostring(dup_err)
+    )
+  )
+  placement_ownership_service.reset()
+end
+
+-- placement_wrapper.placement_orphan_recovery_service: orphan placement recovery
+do
+  local name = "placement_wrapper.placement_orphan_recovery_service.recover_from_saved_registry(recovers valid entries and reports orphans)"
+  placement_ownership_service.reset()
+  local tmp_dist = path_utils.join(TEST_DIR, "_tmp_orphan_recovery_dist")
+  local saved, save_err = placement_save_service.save_player_placements(tmp_dist, {
+    {
+      placementId = "placement_valid_01",
+      ownerId = "player_01",
+      packId = "starter_furniture",
+      objectId = "chair_basic_01",
+      provider = "world_builder",
+    },
+    {
+      placementId = "placement_orphan_01",
+      ownerId = "",
+      packId = "starter_furniture",
+      objectId = "chair_basic_02",
+      provider = "world_builder",
+    },
+  })
+  local result, recovery_err = placement_orphan_recovery_service.recover_from_saved_registry(tmp_dist)
+  local ok_recovery = saved == true
+    and save_err == nil
+    and recovery_err == nil
+    and type(result) == "table"
+    and result.recoveredCount == 1
+    and result.orphanedCount == 1
+    and type(result.recoveredPlacementIds) == "table"
+    and result.recoveredPlacementIds[1] == "placement_valid_01"
+    and type(result.orphanedEntries) == "table"
+    and type(result.orphanedEntries[1]) == "table"
+    and type(result.orphanedEntries[1].reason) == "string"
+    and result.orphanedEntries[1].reason:find("missing ownerId", 1, true) ~= nil
+  assert_true(
+    ok_recovery,
+    name,
+    string.format("expected orphan recovery result, got result=%s recovery_err=%s", tostring(result), tostring(recovery_err))
+  )
+  pcall(os.remove, path_utils.join(tmp_dist, "player_placements.json"))
+  if package.config:sub(1, 1) == "\\" then
+    os.execute('cmd /c rmdir "' .. tmp_dist:gsub("/", "\\"):gsub('"', "") .. '" 2>nul')
+  else
+    os.execute('rmdir "' .. tmp_dist:gsub('"', "") .. '" 2>/dev/null')
+  end
+  placement_ownership_service.reset()
+end
+
+-- placement_wrapper.placement_load_service: corrupted placement save recovery
+do
+  local name = "placement_wrapper.placement_load_service.load_player_placements_with_recovery(recovers from corrupted save)"
+  local tmp_dist = path_utils.join(TEST_DIR, "_tmp_corrupted_placements_dist")
+  if package.config:sub(1, 1) == "\\" then
+    os.execute('cmd /c mkdir "' .. tmp_dist:gsub("/", "\\"):gsub('"', "") .. '" 2>nul')
+  else
+    os.execute('mkdir "' .. tmp_dist:gsub('"', "") .. '" 2>/dev/null')
+  end
+  local bad_path = path_utils.join(tmp_dist, "player_placements.json")
+  local fh, ferr = io.open(bad_path, "wb")
+  if not fh then
+    fail(string.format("[FAIL] %s — could not create corrupted placement save: %s", name, tostring(ferr)))
+  else
+    fh:write("{ invalid placement save json")
+    fh:close()
+    local recovered, recovery_err, used_fallback = placement_load_service.load_player_placements_with_recovery(tmp_dist)
+    local ok_recovery = recovery_err == nil
+      and used_fallback == true
+      and type(recovered) == "table"
+      and #recovered == 0
+    assert_true(
+      ok_recovery,
+      name,
+      string.format(
+        "expected corrupted save fallback to empty table, got recovered=%s err=%s used_fallback=%s",
+        tostring(recovered),
+        tostring(recovery_err),
+        tostring(used_fallback)
+      )
+    )
+  end
+  pcall(os.remove, bad_path)
+  if package.config:sub(1, 1) == "\\" then
+    os.execute('cmd /c rmdir "' .. tmp_dist:gsub("/", "\\"):gsub('"', "") .. '" 2>nul')
+  else
+    os.execute('rmdir "' .. tmp_dist:gsub('"', "") .. '" 2>/dev/null')
+  end
+end
+
+-- placement_wrapper.placement_provider_registry: provider unavailable handling
+do
+  local name = "placement_wrapper.placement_provider_registry.check_health_before_delegation(rejects unavailable provider)"
+  placement_provider_registry.reset()
+  local registered, register_err = placement_provider_registry.register({
+    id = "wb_unavailable",
+    name = "World Builder",
+    version = "v0.4.0",
+    state = "disabled",
+    capabilities = {
+      supportsPlacement = true,
+    },
+  })
+  local ok_health, health_err = placement_provider_registry.check_health_before_delegation(
+    "wb_unavailable",
+    "supportsPlacement"
+  )
+  local rejected = registered ~= nil
+    and register_err == nil
+    and ok_health == false
+    and type(health_err) == "string"
+    and health_err:find("provider is not available", 1, true) ~= nil
+  assert_true(
+    rejected,
+    name,
+    string.format(
+      "expected unavailable provider rejection, got ok=%s health_err=%s register_err=%s",
+      tostring(ok_health),
+      tostring(health_err),
+      tostring(register_err)
+    )
+  )
+  placement_provider_registry.reset()
+end
+
+-- placement_wrapper.placement_queue_service: deterministic placement export ordering
+do
+  local name = "placement_wrapper.placement_queue_service.enqueue_export_payloads_deterministic(enqueues in requestId order)"
+  local original_enqueue = placement_queue_service.enqueue_export_payload
+  local ordered_ids = {}
+  placement_queue_service.enqueue_export_payload = function(_, payload)
+    ordered_ids[#ordered_ids + 1] = payload.requestId
+    return true, nil
+  end
+
+  local ok_enqueue, err_enqueue = placement_queue_service.enqueue_export_payloads_deterministic("dist", {
+    { requestId = "req_c" },
+    { requestId = "req_a" },
+    { requestId = "req_b" },
+  })
+
+  placement_queue_service.enqueue_export_payload = original_enqueue
+
+  local deterministic = ok_enqueue == true
+    and err_enqueue == nil
+    and #ordered_ids == 3
+    and ordered_ids[1] == "req_a"
+    and ordered_ids[2] == "req_b"
+    and ordered_ids[3] == "req_c"
+  assert_true(
+    deterministic,
+    name,
+    string.format(
+      "expected sorted requestId order req_a, req_b, req_c; got ok=%s err=%s order=%s",
+      tostring(ok_enqueue),
+      tostring(err_enqueue),
+      table.concat(ordered_ids, ",")
+    )
+  )
+end
+
+-- placement_wrapper.placement_removal_service: ownership validation during removal requests
+do
+  local name = "placement_wrapper.placement_removal_service.create_request(rejects removal when owner mismatches)"
+  placement_ownership_service.reset()
+  local registered, register_err = placement_ownership_service.register({
+    placementId = "placement_remove_01",
+    ownerId = "player_owner",
+    packId = "starter_furniture",
+    objectId = "chair_basic_01",
+    provider = "world_builder",
+  })
+  local request, request_err = placement_removal_service.create_request(
+    "placement_remove_01",
+    "player_other",
+    "session_01",
+    "world_builder"
+  )
+  local rejected = registered ~= nil
+    and register_err == nil
+    and request == nil
+    and type(request_err) == "string"
+    and request_err:find("not owned by owner_id", 1, true) ~= nil
+  assert_true(
+    rejected,
+    name,
+    string.format(
+      "expected ownership rejection for removal request, got request=%s request_err=%s register_err=%s",
+      tostring(request),
+      tostring(request_err),
+      tostring(register_err)
+    )
+  )
+  placement_ownership_service.reset()
+end
+
+-- placement_wrapper.placement_removal_service: original world objects never marked owned
+do
+  local name = "placement_wrapper.placement_removal_service.mark_removed(never touches original world objects)"
+  placement_ownership_service.reset()
+  local registered, register_err = placement_ownership_service.register({
+    placementId = "placement_safe_remove_01",
+    ownerId = "player_owner",
+    packId = "starter_furniture",
+    objectId = "chair_basic_01",
+    provider = "world_builder",
+  })
+  local removal_metadata, removal_err = placement_removal_service.mark_removed("placement_safe_remove_01", "player_owner")
+  local safe = registered ~= nil
+    and register_err == nil
+    and removal_err == nil
+    and type(removal_metadata) == "table"
+    and removal_metadata.touchedOriginalWorldObject == false
+    and removal_metadata.removalMode == "metadata_only"
+  assert_true(
+    safe,
+    name,
+    string.format(
+      "expected metadata-only removal with touchedOriginalWorldObject=false, got metadata=%s err=%s",
+      tostring(removal_metadata),
+      tostring(removal_err)
+    )
+  )
+  placement_ownership_service.reset()
 end
 
 if failures > 0 then

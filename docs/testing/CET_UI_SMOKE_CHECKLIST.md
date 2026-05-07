@@ -33,3 +33,7 @@ Use this checklist for quick manual validation of the catalog UI behavior in CET
 
 - [ ] Verify empty-state messages appear when expected.
 - [ ] Verify validation error panel shows latest lines from `dist/cyberbuilder_errors.log`.
+
+---
+
+Last reviewed: 2026-05-07.

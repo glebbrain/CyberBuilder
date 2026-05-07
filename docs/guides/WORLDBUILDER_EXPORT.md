@@ -47,3 +47,8 @@ This file contains one selected normalized `resourcePath`.
 
 - Export summary: `dist/cyberbuilder_export_summary.json`
 - Error log: `dist/cyberbuilder_errors.log`
+- Placement Wrapper hand-off and queue: `docs/WORLDBUILDER_BRIDGE.md`
+
+---
+
+Last reviewed: 2026-05-07.

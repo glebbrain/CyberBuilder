@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlacementTransform",
+  "type": "object",
+  "properties": {
+    "position": {
+      "type": "object",
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" }
+      },
+      "required": ["x", "y", "z"],
+      "additionalProperties": false
+    },
+    "rotation": {
+      "type": "object",
+      "properties": {
+        "pitch": { "type": "number", "minimum": 0, "maximum": 360 },
+        "yaw": { "type": "number", "minimum": 0, "maximum": 360 },
+        "roll": { "type": "number", "minimum": 0, "maximum": 360 }
+      },
+      "required": ["pitch", "yaw", "roll"],
+      "additionalProperties": false
+    },
+    "scale": {
+      "type": "number",
+      "minimum": 0.1,
+      "maximum": 3.0
+    }
+  },
+  "required": [
+    "position",
+    "rotation",
+    "scale"
+  ],
+  "additionalProperties": false
+}

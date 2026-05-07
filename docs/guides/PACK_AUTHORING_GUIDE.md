@@ -77,3 +77,7 @@ To keep catalog/export stable across builds:
 Pack authoring for v0.3 prepares safe authorization/catalog behavior only.
 
 Do not assume pack data grants direct spawn/place/delete behavior in-game.
+
+---
+
+Last reviewed: 2026-05-07.

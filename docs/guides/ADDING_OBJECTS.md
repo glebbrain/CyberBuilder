@@ -96,3 +96,7 @@ Open the catalog UI and verify:
 - tags not lowercase strings;
 - missing `resourcePath` on enabled object;
 - recipe `objectId` not found in `objects.json`.
+
+---
+
+Last reviewed: 2026-05-07.

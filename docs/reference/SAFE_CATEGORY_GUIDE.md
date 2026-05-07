@@ -68,3 +68,7 @@ To avoid ambiguity and warnings:
 This guide applies to Construction Chip v0.3 gameplay-facing catalog authorization only.
 
 It does not authorize spawning, deletion, scanner gameplay, or direct world editing.
+
+---
+
+Last reviewed: 2026-05-07.

@@ -1,0 +1,32 @@
+[
+  {
+    "id": "blocked_npc_example",
+    "name": "Blocked NPC Example",
+    "packId": "starter_safe_placements",
+    "objectId": "npc_actor_01",
+    "category": "NPC",
+    "tags": ["npc"],
+    "expectedBlocked": true,
+    "expectedReasonCode": "unsafe_category"
+  },
+  {
+    "id": "blocked_vehicle_example",
+    "name": "Blocked Vehicle Example",
+    "packId": "starter_safe_placements",
+    "objectId": "vehicle_car_01",
+    "category": "Vehicle",
+    "tags": ["vehicle"],
+    "expectedBlocked": true,
+    "expectedReasonCode": "unsafe_category"
+  },
+  {
+    "id": "blocked_quest_tag_example",
+    "name": "Blocked Quest Tag Example",
+    "packId": "starter_safe_placements",
+    "objectId": "decor_prop_quest_01",
+    "category": "Decor",
+    "tags": ["quest"],
+    "expectedBlocked": true,
+    "expectedReasonCode": "forbidden_tag"
+  }
+]

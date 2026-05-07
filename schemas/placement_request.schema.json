@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlacementRequest",
+  "type": "object",
+  "properties": {
+    "requestId": { "type": "string" },
+    "sessionId": { "type": "string" },
+    "ownerId": { "type": "string" },
+    "packId": { "type": "string" },
+    "objectId": { "type": "string" },
+    "globalId": { "type": "string" },
+    "provider": { "type": "string" },
+    "position": {
+      "type": "object",
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" }
+      },
+      "required": ["x", "y", "z"],
+      "additionalProperties": false
+    },
+    "rotation": {
+      "type": "object",
+      "properties": {
+        "pitch": { "type": "number" },
+        "yaw": { "type": "number" },
+        "roll": { "type": "number" }
+      },
+      "required": ["pitch", "yaw", "roll"],
+      "additionalProperties": false
+    },
+    "scale": {
+      "type": "number",
+      "minimum": 0.1,
+      "maximum": 3.0
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "requestedAt": { "type": "string" }
+  },
+  "required": [
+    "requestId",
+    "sessionId",
+    "ownerId",
+    "packId",
+    "objectId",
+    "globalId",
+    "provider",
+    "position",
+    "rotation",
+    "scale",
+    "tags",
+    "requestedAt"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlacementSession",
+  "type": "object",
+  "properties": {
+    "sessionId": { "type": "string" },
+    "ownerId": { "type": "string" },
+    "provider": { "type": "string" },
+    "state": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "validated",
+        "delegated",
+        "placed",
+        "failed",
+        "removed"
+      ]
+    },
+    "createdAt": { "type": "string" },
+    "lastModifiedAt": { "type": "string" },
+    "expiresAt": { "type": "string" }
+  },
+  "required": [
+    "sessionId",
+    "ownerId",
+    "provider",
+    "state",
+    "createdAt",
+    "lastModifiedAt"
+  ],
+  "additionalProperties": false
+}

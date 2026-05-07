@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlayerPlacements",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "placementId": { "type": "string" },
+      "ownerId": { "type": "string" },
+      "packId": { "type": "string" },
+      "objectId": { "type": "string" },
+      "provider": { "type": "string" },
+      "sessionId": { "type": "string" },
+      "requestId": { "type": "string" },
+      "createdAt": { "type": "string" },
+      "lastModifiedAt": { "type": "string" },
+      "state": {
+        "type": "string",
+        "enum": [
+          "placed",
+          "removed",
+          "failed"
+        ]
+      }
+    },
+    "required": [
+      "placementId",
+      "ownerId",
+      "packId",
+      "objectId",
+      "provider",
+      "createdAt",
+      "lastModifiedAt",
+      "state"
+    ],
+    "additionalProperties": false
+  }
+}
