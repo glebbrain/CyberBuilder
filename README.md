@@ -5,9 +5,9 @@ CyberBuilder validates **JSON packs** under `packs/*`, builds a **catalog snapsh
 ## Requirements
 
 - **Lua** on your `PATH` (plain Lua 5.x; `lfs` recommended).
-- Packs as folders: `pack.json`, `objects.json`, `recipes.json` (see `docs/PACK_FORMAT.md`).
+- Packs as folders: `pack.json`, `objects.json`, `recipes.json` (see `docs/reference/PACK_FORMAT.md`).
 
-For OS-specific setup and scripted install flow, use `docs/INSTALL.md` and the orchestrators under `scripts/install/`.
+For OS-specific setup and scripted install flow, use `docs/setup/INSTALL.md` and the orchestrators under `scripts/install/`.
 Install scripts support backup-first flow and best-effort CET/Lua dependency setup.
 
 ## Usage (repo root)
@@ -60,11 +60,11 @@ lua tests/run_pack_registry_tests.lua
 | Doc | Purpose |
 |-----|---------|
 | `docs/README.md` | MVP scope, World Builder dependency, non-goals |
-| `docs/MODDER_QUICKSTART.md` | Create a pack from `packs/starter_furniture` |
-| `docs/PACK_FORMAT.md` | JSON field reference |
-| `docs/SAFETY_RULES.md` | MVP blacklist (NPC, vehicles, quests, etc.) |
-| `docs/INSTALL.md` | Full install flow (Windows/macOS), script map, and command examples |
-| `docs/ROADMAP.md` | Post-MVP direction (high level) |
+| `docs/setup/MODDER_QUICKSTART.md` | Create a pack from `packs/starter_furniture` |
+| `docs/reference/PACK_FORMAT.md` | JSON field reference |
+| `docs/reference/SAFETY_RULES.md` | MVP blacklist (NPC, vehicles, quests, etc.) |
+| `docs/setup/INSTALL.md` | Full install flow (Windows/macOS), script map, and command examples |
+| `docs/roadmap/ROADMAP.md` | Post-MVP direction (high level) |
 
 ## Official Mod Stack Links
 
@@ -82,6 +82,7 @@ lua tests/run_pack_registry_tests.lua
 - **No in-game placement** from this repo alone; v0.2 UI is browse-only and exports paths for World Builder.
 - **Invalid packs are skipped** with errors logged; they do not stop other packs from exporting.
 - **`ignoredPackIds`** in config excludes pack folders from processing (the repo ships `broken_example_pack` as intentionally broken test data—remove its id from the list only when you want to exercise failures).
-- **Resource paths** are not verified against the real game; you must supply correct `resourcePath` values yourself (`docs/SAFETY_RULES.md`, `.manager/ruls.md`).
+- **Resource paths** are not verified against the real game; you must supply correct `resourcePath` values yourself (`docs/reference/SAFETY_RULES.md`, `.manager/ruls.md`).
 - **Optional install copy** to a World Builder spawnables directory only runs when `worldBuilderSpawnablesDir` points at a path that contains `entSpawner/data/spawnables` (after normalization).
 - **External logging target** is adapter-based in MVP: set `logging.externalEnabled=true` and pass a handler from integration code; no hard dependency on a specific vendor is included.
+

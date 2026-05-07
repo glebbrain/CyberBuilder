@@ -7,7 +7,7 @@ CyberBuilder reads every subdirectory of `packs/` that contains `pack.json`, `ob
 1. In the repo root, duplicate the folder **`packs/starter_furniture`**.
 2. Rename the copy to your pack id, for example **`packs/my_furniture_pack`**.
 
-The **folder name** must be a stable slug (letters, digits, `_`, `-`) and must match the **`id`** field in `pack.json` (see `docs/PACK_FORMAT.md`).
+The **folder name** must be a stable slug (letters, digits, `_`, `-`) and must match the **`id`** field in `pack.json` (see `docs/reference/PACK_FORMAT.md`).
 
 ## 2. Edit `pack.json`
 
@@ -23,7 +23,7 @@ Each entry is one catalog object. After copying:
 
 1. Change **`id`** values so they stay **unique within your pack** (and do not collide with ids you intend to keep from the template if you only partially replaced rows).
 2. Set **`resourcePath`** only to paths you have verified for your mod or asset pipeline. **Do not invent Cyberpunk resource paths**; leave placeholders **disabled** until you have a real path (see below).
-3. Set **`disabled`** to `false` only when the row is valid for export: required fields present, **`resourcePath`** non-empty for enabled objects, and **`type`** is one of the supported values in `docs/PACK_FORMAT.md`.
+3. Set **`disabled`** to `false` only when the row is valid for export: required fields present, **`resourcePath`** non-empty for enabled objects, and **`type`** is one of the supported values in `docs/reference/PACK_FORMAT.md`.
 
 The starter objects are intentionally **`disabled: true`** with empty **`resourcePath`** so the pack validates without guessing game paths.
 
@@ -64,7 +64,8 @@ On success, check **`dist/`** for generated World Builder–oriented exports, **
 
 ## Where to read next
 
-- **`docs/PACK_FORMAT.md`** — field-by-field format.
+- **`docs/reference/PACK_FORMAT.md`** — field-by-field format.
 - **`docs/README.md`** — MVP scope and World Builder role.
-- **`docs/INSTALL.md`** — dependency stack setup and install scripts.
+- **`docs/setup/INSTALL.md`** — dependency stack setup and install scripts.
 - **World Builder page** — [Nexus Mods](https://www.nexusmods.com/cyberpunk2077/mods/20660).
+

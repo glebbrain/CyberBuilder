@@ -705,7 +705,7 @@ PY
   exit 0
 fi
 
-echo "CyberBuilder prerequisite check (see docs/INSTALL.md)"
+echo "CyberBuilder prerequisite check (see docs/setup/INSTALL.md)"
 echo
 
 if [[ -z "$RESOLVED_GAME_PATH" ]]; then
@@ -753,4 +753,5 @@ for i in "${!COMPONENT_NAMES[@]}"; do
 done
 
 echo
-echo "CyberBuilder MVP only validates packs and exports World Builder-oriented outputs; it does not replace any of the above (docs/INSTALL.md)."
+echo "CyberBuilder MVP only validates packs and exports World Builder-oriented outputs; it does not replace any of the above (docs/setup/INSTALL.md)."
+

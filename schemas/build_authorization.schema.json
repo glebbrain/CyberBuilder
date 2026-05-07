@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BuildAuthorization",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "packId": { "type": "string" },
+      "objectId": { "type": "string" },
+      "globalId": { "type": "string" },
+      "name": { "type": "string" },
+      "type": { "type": "string" },
+      "resourcePath": { "type": "string" },
+      "category": { "type": "string" },
+      "tags": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "tier": {
+        "type": "string",
+        "enum": ["Tier1", "Tier2", "Tier3", "Developer"]
+      },
+      "authorized": { "type": "boolean" }
+    },
+    "required": [
+      "packId",
+      "objectId",
+      "globalId",
+      "name",
+      "type",
+      "resourcePath",
+      "category",
+      "tags",
+      "tier",
+      "authorized"
+    ]
+  }
+}

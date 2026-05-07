@@ -84,6 +84,33 @@ Root orchestrators already follow this sequence automatically.
   - backup targets configured by backup options.
 - Must not overwrite existing plugin folders without backup-first behavior or explicit opt-out flags.
 
+## Lua for CLI build and tests (Windows)
+
+CyberBuilder validates packs and exports via `src/cyber_builder/init.lua`. You need **Lua 5.4+** on `PATH` (or set `luaExecutable` in `cyberbuilder.config.json`).
+
+Typical install locations after package managers:
+
+| Source | Example path | Install command |
+|--------|----------------|-----------------|
+| Scoop | `%USERPROFILE%\scoop\shims\lua.exe` | `scoop install lua` |
+| Scoop app dir | `%USERPROFILE%\scoop\apps\lua\current\bin\lua.exe` | (same) |
+| winget | On `PATH` as `lua.exe` | `winget install --id Lua.Lua --source winget` |
+
+Upstream references:
+
+- Lua sources: [lua/lua on GitHub](https://github.com/lua/lua)
+- LuaFileSystem (optional `lfs`): [lunarmodules/luafilesystem on GitHub](https://github.com/lunarmodules/luafilesystem)
+
+Repo checks (from repository root):
+
+```powershell
+.\scripts\build\clean.ps1
+.\scripts\build\build.ps1
+lua tests\run_pack_registry_tests.lua
+```
+
+Pin the interpreter for `scripts/build/build.ps1` by setting `luaExecutable` in `cyberbuilder.config.json` (absolute path to `lua.exe`).
+
 ## Quick commands
 
 ### Windows (recommended entrypoint)

@@ -15,6 +15,33 @@ local pack_registry = dofile(dir .. "pack_registry.lua")
 local schema_validator = dofile(dir .. "schema_validator.lua")
 local worldbuilder_exporter = dofile(dir .. "worldbuilder_exporter.lua")
 
+local construction_chip_dir = path_utils.join(dir, "construction_chip")
+local build_authorizer = dofile(path_utils.join(construction_chip_dir, "build_authorizer.lua"))
+local player_progression = dofile(path_utils.join(construction_chip_dir, "player_progression.lua"))
+local chip_load_service = dofile(path_utils.join(construction_chip_dir, "chip_load_service.lua"))
+
+--- Dependencies that are not other pack ids (tooling / runtime capabilities).
+local VIRTUAL_PACK_DEPS = {
+  world_builder = true,
+}
+
+local function pack_requires_satisfied(pack, valid_pack_ids)
+  if type(pack) ~= "table" or type(pack.requires) ~= "table" then
+    return true
+  end
+  for _, r in ipairs(pack.requires) do
+    if type(r) ~= "string" or r == "" then
+      return false
+    end
+    if VIRTUAL_PACK_DEPS[r] then
+    elseif valid_pack_ids[r] then
+    else
+      return false
+    end
+  end
+  return true
+end
+
 local DEFAULT_LOGGING = {
   level = "INFO",
   targets = { "console" },
@@ -421,6 +448,15 @@ function cyber_builder.run(opts)
     return false, serr
   end
   config.distDir = safe_dist
+
+  build_authorizer.clear_cache()
+  local saves_dir = path_utils.join(repo, "saves")
+  local unlock_data, unlock_note = chip_load_service.load_unlock_state_with_fallback(saves_dir)
+  if unlock_note then
+    logger.info("[ConstructionChip] " .. unlock_note, { stage = "unlock_load" })
+  end
+  player_progression.apply_chip_unlock_data(unlock_data)
+
   logger.configure({
     level = opts.logLevel or logging_cfg.level or DEFAULT_LOGGING.level,
     targets = cli_targets or logging_cfg.targets or DEFAULT_LOGGING.targets,
@@ -445,6 +481,8 @@ function cyber_builder.run(opts)
     entity_lines_written = 0,
     mesh_lines_written = 0,
   }
+
+  local chip_candidates = {}
 
   local packs, derr = pack_registry.discover(config.packsDir)
   if not packs then
@@ -519,6 +557,10 @@ function cyber_builder.run(opts)
           if not pok or not ook or not rok then
             stats.packs_invalid = stats.packs_invalid + 1
           else
+            chip_candidates[#chip_candidates + 1] = {
+              pack = pack,
+              objects = objects,
+            }
             stats.packs_valid = stats.packs_valid + 1
             stats.objects_exported = stats.objects_exported + count_export_eligible_objects(objects)
             stats.objects_skipped = stats.objects_skipped + count_disabled_objects(objects)
@@ -576,6 +618,69 @@ function cyber_builder.run(opts)
         end
       end
     end
+  end
+
+  local valid_pack_ids = {}
+  for _, c in ipairs(chip_candidates) do
+    local pid = type(c.pack.id) == "string" and c.pack.id or ""
+    if pid ~= "" then
+      valid_pack_ids[pid] = true
+    end
+  end
+
+  local validated_packs = {}
+  for _, c in ipairs(chip_candidates) do
+    local deps_ok = pack_requires_satisfied(c.pack, valid_pack_ids)
+    validated_packs[#validated_packs + 1] = {
+      isValid = deps_ok,
+      pack = c.pack,
+      objects = c.objects,
+    }
+    if not deps_ok then
+      logger.warn(
+        string.format(
+          "[ConstructionChip] pack %s not authorized (unsatisfied pack.requires)",
+          tostring(c.pack.id)
+        ),
+        { pack_id = c.pack.id, stage = "pack_requires" }
+      )
+    end
+  end
+
+  local authorized, auth_err = build_authorizer.generate_from_valid_packs(validated_packs)
+  if not authorized then
+    emit_error(tostring(auth_err), "CHIP_AUTHORIZATION", { stage = "construction_chip" })
+  elseif dry_run then
+    logger.info(
+      string.format("[ConstructionChip] dry-run: would export %d authorization entries", #authorized),
+      { stage = "construction_chip" }
+    )
+  else
+    local _, exp_err = build_authorizer.export_authorization_file(authorized, config.distDir)
+    if exp_err then
+      emit_error(tostring(exp_err), "CHIP_EXPORT_AUTH", { stage = "construction_chip" })
+    end
+    local all_chip_objects = {}
+    for _, vp in ipairs(validated_packs) do
+      if type(vp.objects) == "table" then
+        for _, o in ipairs(vp.objects) do
+          all_chip_objects[#all_chip_objects + 1] = o
+        end
+      end
+    end
+    local _, blocked_err =
+      build_authorizer.export_blocked_objects_report(all_chip_objects, authorized, config.distDir)
+    if blocked_err then
+      emit_error(tostring(blocked_err), "CHIP_EXPORT_BLOCKED", { stage = "construction_chip" })
+    end
+    local _, sum_err = player_progression.export_unlock_summary(config.distDir)
+    if sum_err then
+      emit_error(tostring(sum_err), "CHIP_EXPORT_UNLOCK_SUMMARY", { stage = "construction_chip" })
+    end
+    logger.info(
+      string.format("[ConstructionChip] wrote gameplay authorization (%d entries)", #authorized),
+      { stage = "construction_chip" }
+    )
   end
 
   logger.info(

@@ -1,0 +1,7 @@
+{
+  "id": "starter_builder_gameplay",
+  "name": "Starter Builder Gameplay",
+  "version": "0.3.0",
+  "author": "CyberBuilder",
+  "requires": ["world_builder"]
+}

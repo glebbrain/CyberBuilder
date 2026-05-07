@@ -45,5 +45,6 @@ Top-level value: **JSON array** of recipe records. Each recipe must reference an
 - Prefer **normalized paths** in `resourcePath` (no mixed slashes; no `..` segments).
 - Invalid packs must be **skippable** without breaking other packs: fix errors in one folder, not across the whole `packs/` tree.
 
-For install prerequisites and MVP boundaries, see `docs/README.md` and `docs/INSTALL.md`.
+For install prerequisites and MVP boundaries, see `docs/README.md` and `docs/setup/INSTALL.md`.
 For the World Builder dependency page, see [Nexus Mods](https://www.nexusmods.com/cyberpunk2077/mods/20660).
+

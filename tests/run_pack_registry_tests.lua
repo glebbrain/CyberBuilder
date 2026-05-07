@@ -35,6 +35,12 @@ local json_loader = dofile(path_utils.join(cyber_dir, "json_loader.lua"))
 local worldbuilder_exporter = dofile(path_utils.join(cyber_dir, "worldbuilder_exporter.lua"))
 local catalog_service = dofile(path_utils.join(cyber_dir, "catalog_service.lua"))
 local logger = dofile(path_utils.join(cyber_dir, "logger.lua"))
+local category_filter = dofile(path_utils.join(cyber_dir, "construction_chip", "category_filter.lua"))
+local build_authorizer = dofile(path_utils.join(cyber_dir, "construction_chip", "build_authorizer.lua"))
+local chip_load_service = dofile(path_utils.join(cyber_dir, "construction_chip", "chip_load_service.lua"))
+local unlock_registry = dofile(path_utils.join(cyber_dir, "construction_chip", "unlock_registry.lua"))
+local catalog_projection = dofile(path_utils.join(cyber_dir, "construction_chip", "catalog_projection.lua"))
+local player_progression = dofile(path_utils.join(cyber_dir, "construction_chip", "player_progression.lua"))
 
 local failures = 0
 
@@ -658,6 +664,339 @@ do
   assert_true(has_all, name, "expected merged context fields in log output line")
   pcall(os.remove, log_path)
   pcall(os.remove, path_utils.join(TEST_DIR, "_tmp_logger_context_errors.log"))
+end
+
+-- construction_chip.category_filter: unsafe categories are always filtered
+do
+  local name = "construction_chip.category_filter.filter_objects(unsafe categories blocked)"
+  local objects = {
+    { id = "safe_01", category = "Furniture" },
+    { id = "safe_02", category = "Decor" },
+    { id = "unsafe_01", category = "NPC" },
+    { id = "unsafe_02", category = "Vehicle" },
+    { id = "unsafe_03", category = "Quest" },
+  }
+  local filtered, err = category_filter.filter_objects(
+    objects,
+    category_filter.ALLOWLIST_CATEGORIES,
+    category_filter.DENYLIST_CATEGORIES
+  )
+  local ok_filtered = type(filtered) == "table"
+    and err == nil
+    and type(filtered.allowed) == "table"
+    and type(filtered.blocked) == "table"
+    and #filtered.allowed == 2
+    and #filtered.blocked == 3
+  local valid_ok, valid_err = category_filter.validate_unsafe_categories_filtered(
+    filtered,
+    category_filter.DENYLIST_CATEGORIES
+  )
+  assert_true(
+    ok_filtered and valid_ok == true and valid_err == nil,
+    name,
+    string.format(
+      "expected safe=2 blocked=3 and validation pass; got allowed=%s blocked=%s err=%s valid_err=%s",
+      tostring(filtered and filtered.allowed and #filtered.allowed or "nil"),
+      tostring(filtered and filtered.blocked and #filtered.blocked or "nil"),
+      tostring(err),
+      tostring(valid_err)
+    )
+  )
+end
+
+-- construction_chip.category_filter: validator rejects denylist category in allowed set
+do
+  local name = "construction_chip.category_filter.validate_unsafe_categories_filtered(rejects unsafe allowed)"
+  local filtered_result = {
+    allowed = {
+      { id = "bad_01", category = "NPC" },
+    },
+    blocked = {},
+  }
+  local ok_safe, err = category_filter.validate_unsafe_categories_filtered(
+    filtered_result,
+    category_filter.DENYLIST_CATEGORIES
+  )
+  local rejected = ok_safe == false and type(err) == "string" and err:find("unsafe category", 1, true) ~= nil
+  assert_true(
+    rejected,
+    name,
+    string.format("expected unsafe allowed rejection, got ok=%s err=%s", tostring(ok_safe), tostring(err))
+  )
+end
+
+-- construction_chip.build_authorizer: disabled objects are rejected from authorization
+do
+  local name = "construction_chip.build_authorizer.authorize_object(rejects disabled)"
+  local entry, err = build_authorizer.authorize_object({
+    id = "disabled_obj_01",
+    name = "Disabled Object",
+    type = "mesh",
+    resourcePath = "props/disabled.mesh",
+    category = "Furniture",
+    tags = { "buildable", "safe" },
+    disabled = true,
+  }, "test_pack")
+  local rejected = entry == nil and type(err) == "string" and err:find("disabled object cannot be authorized", 1, true) ~= nil
+  assert_true(
+    rejected,
+    name,
+    string.format("expected disabled rejection, got entry=%s err=%s", tostring(entry), tostring(err))
+  )
+end
+
+-- construction_chip.build_authorizer: deterministic authorization ordering
+do
+  local name = "construction_chip.build_authorizer.sort_authorized_entries(deterministic ordering)"
+  local entries = {
+    { globalId = "pack_b:z1", category = "Furniture", name = "Zeta" },
+    { globalId = "pack_a:a1", category = "Decor", name = "Alpha" },
+    { globalId = "pack_a:b1", category = "Decor", name = "Beta" },
+    { globalId = "pack_b:a1", category = "Furniture", name = "Alpha" },
+    { globalId = "pack_a:a2", category = "Decor", name = "Alpha" },
+  }
+  local sorted, err = build_authorizer.sort_authorized_entries(entries)
+  local sorted2, err2 = build_authorizer.sort_authorized_entries(entries)
+  local ok_sorted = type(sorted) == "table"
+    and err == nil
+    and type(sorted2) == "table"
+    and err2 == nil
+    and #sorted == 5
+    and #sorted2 == 5
+    and sorted[1].globalId == "pack_a:a1"
+    and sorted[2].globalId == "pack_a:a2"
+    and sorted[3].globalId == "pack_a:b1"
+    and sorted[4].globalId == "pack_b:a1"
+    and sorted[5].globalId == "pack_b:z1"
+    and sorted[1].globalId == sorted2[1].globalId
+    and sorted[2].globalId == sorted2[2].globalId
+    and sorted[3].globalId == sorted2[3].globalId
+    and sorted[4].globalId == sorted2[4].globalId
+    and sorted[5].globalId == sorted2[5].globalId
+  assert_true(
+    ok_sorted,
+    name,
+    string.format(
+      "expected deterministic order by category/name/globalId; got err=%s err2=%s",
+      tostring(err),
+      tostring(err2)
+    )
+  )
+end
+
+-- construction_chip.chip_load_service: corrupted unlock save falls back safely
+do
+  local name = "construction_chip.chip_load_service.load_unlock_state_with_fallback(corrupted save recovery)"
+  local tmp_dir = path_utils.join(TEST_DIR, "_tmp_corrupt_unlock_save")
+  if package.config:sub(1, 1) == "\\" then
+    os.execute('cmd /c mkdir "' .. tmp_dir:gsub("/", "\\"):gsub('"', "") .. '" 2>nul')
+  else
+    os.execute('mkdir "' .. tmp_dir:gsub('"', "") .. '" 2>/dev/null')
+  end
+  local bad_file = path_utils.join(tmp_dir, "player_unlocks.json")
+  local fh, ferr = io.open(bad_file, "wb")
+  if not fh then
+    fail(string.format("[FAIL] %s — could not create corrupted save file: %s", name, tostring(ferr)))
+  else
+    fh:write("{ invalid unlock json")
+    fh:close()
+    local data, err = chip_load_service.load_unlock_state_with_fallback(tmp_dir)
+    local ok_fallback = type(data) == "table"
+      and type(err) == "string"
+      and err:find("used fallback", 1, true) ~= nil
+      and data.version == "0.3.0"
+      and data.chipState == "installed"
+      and data.activeTier == "Tier1"
+      and type(data.unlockedTiers) == "table"
+      and #data.unlockedTiers == 1
+      and data.unlockedTiers[1] == "Tier1"
+      and type(data.unlockedObjectIds) == "table"
+      and #data.unlockedObjectIds == 0
+      and data.updatedAt == "1970-01-01T00:00:00Z"
+    assert_true(
+      ok_fallback,
+      name,
+      string.format("expected fallback unlock state, got data=%s err=%s", tostring(data), tostring(err))
+    )
+    pcall(os.remove, bad_file)
+    if package.config:sub(1, 1) == "\\" then
+      os.execute('cmd /c rmdir "' .. tmp_dir:gsub("/", "\\"):gsub('"', "") .. '" 2>nul')
+    else
+      os.execute('rmdir "' .. tmp_dir:gsub('"', "") .. '" 2>/dev/null')
+    end
+  end
+end
+
+-- construction_chip.unlock_registry: duplicate unlock id detection
+do
+  local name = "construction_chip.unlock_registry.validate_no_duplicate_unlock_ids(rejects duplicates)"
+  local ok_dup, err_dup = unlock_registry.validate_no_duplicate_unlock_ids({
+    "unlock_tier1",
+    "unlock_tier2",
+    "unlock_tier1",
+  })
+  local rejected = ok_dup == false
+    and type(err_dup) == "string"
+    and err_dup:find("duplicate unlock id", 1, true) ~= nil
+    and err_dup:find("unlock_tier1", 1, true) ~= nil
+  assert_true(
+    rejected,
+    name,
+    string.format("expected duplicate unlock id rejection, got ok=%s err=%s", tostring(ok_dup), tostring(err_dup))
+  )
+end
+
+-- construction_chip.catalog_projection: hidden/internal excluded by default
+do
+  local name = "construction_chip.catalog_projection.project(excludes hidden/internal by default)"
+  local entries = {
+    {
+      globalId = "pack:visible_01",
+      packId = "pack",
+      objectId = "visible_01",
+      name = "Visible",
+      type = "mesh",
+      category = "Furniture",
+      tags = { "buildable" },
+      resourcePath = "props/visible.mesh",
+      authorized = true,
+    },
+    {
+      globalId = "pack:hidden_01",
+      packId = "pack",
+      objectId = "hidden_01",
+      name = "Hidden",
+      type = "mesh",
+      category = "Furniture",
+      tags = { "hidden" },
+      resourcePath = "props/hidden.mesh",
+      authorized = true,
+    },
+    {
+      globalId = "pack:internal_01",
+      packId = "pack",
+      objectId = "internal_01",
+      name = "Internal",
+      type = "mesh",
+      category = "Furniture",
+      tags = { "decor" },
+      resourcePath = "props/internal.mesh",
+      internal = true,
+      authorized = true,
+    },
+  }
+  local projected_default, err_default = catalog_projection.project(entries)
+  local projected_all, err_all = catalog_projection.project(entries, { includeHidden = true })
+  local ok_visibility = type(projected_default) == "table"
+    and err_default == nil
+    and #projected_default == 1
+    and projected_default[1].objectId == "visible_01"
+    and type(projected_all) == "table"
+    and err_all == nil
+    and #projected_all == 3
+  assert_true(
+    ok_visibility,
+    name,
+    string.format(
+      "expected default=1 visible and includeHidden=3 total; got default=%s all=%s errs=(%s,%s)",
+      tostring(projected_default and #projected_default or "nil"),
+      tostring(projected_all and #projected_all or "nil"),
+      tostring(err_default),
+      tostring(err_all)
+    )
+  )
+end
+
+-- construction_chip.build_authorizer: packs flagged invalid (e.g. missing dependencies) are skipped
+do
+  local name = "construction_chip.build_authorizer.generate_from_valid_packs(skips missing-dependency packs)"
+  local validated_packs = {
+    {
+      isValid = true,
+      pack = { id = "ok_pack" },
+      objects = {
+        {
+          id = "ok_obj_01",
+          name = "OK",
+          type = "mesh",
+          resourcePath = "props/ok.mesh",
+          category = "Furniture",
+          tags = { "buildable", "safe" },
+          disabled = false,
+        },
+      },
+    },
+    {
+      isValid = false,
+      validationErrors = { "missing required dependency: world_builder" },
+      pack = { id = "missing_dep_pack" },
+      objects = {
+        {
+          id = "bad_obj_01",
+          name = "Should Be Skipped",
+          type = "mesh",
+          resourcePath = "props/bad.mesh",
+          category = "Furniture",
+          tags = { "buildable", "safe" },
+          disabled = false,
+        },
+      },
+    },
+  }
+  local authorized, err = build_authorizer.generate_from_valid_packs(validated_packs)
+  local ok_skip = type(authorized) == "table"
+    and err == nil
+    and #authorized == 1
+    and authorized[1].packId == "ok_pack"
+    and authorized[1].objectId == "ok_obj_01"
+  assert_true(
+    ok_skip,
+    name,
+    string.format(
+      "expected only valid/dependency-satisfied pack objects, got count=%s err=%s",
+      tostring(authorized and #authorized or "nil"),
+      tostring(err)
+    )
+  )
+end
+
+-- construction_chip.player_progression: tier restriction enforcement
+do
+  local name = "construction_chip.player_progression.can_access_tier(enforces tier restrictions)"
+  player_progression.reset()
+  local can_t1, err_t1 = player_progression.can_access_tier("Tier1")
+  local can_t2_before, err_t2_before = player_progression.can_access_tier("Tier2")
+  local unlocked, unlock_err = player_progression.unlock_tier("Tier2")
+  local activated, activate_err = player_progression.set_active_tier("Tier2")
+  local can_t2_after, err_t2_after = player_progression.can_access_tier("Tier2")
+  local can_dev, err_dev = player_progression.can_access_tier("Developer")
+  local ok_gate = can_t1 == true
+    and err_t1 == nil
+    and can_t2_before == false
+    and err_t2_before == nil
+    and unlocked == true
+    and unlock_err == nil
+    and activated == true
+    and activate_err == nil
+    and can_t2_after == true
+    and err_t2_after == nil
+    and can_dev == false
+    and err_dev == nil
+  assert_true(
+    ok_gate,
+    name,
+    string.format(
+      "expected tier gating enforcement; got t1=%s t2_before=%s t2_after=%s dev=%s errs=(%s,%s,%s,%s)",
+      tostring(can_t1),
+      tostring(can_t2_before),
+      tostring(can_t2_after),
+      tostring(can_dev),
+      tostring(err_t1),
+      tostring(err_t2_before),
+      tostring(err_t2_after),
+      tostring(err_dev)
+    )
+  )
 end
 
 if failures > 0 then

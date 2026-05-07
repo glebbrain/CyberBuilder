@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ChipUnlocks",
+  "type": "object",
+  "properties": {
+    "version": { "type": "string" },
+    "chipState": {
+      "type": "string",
+      "enum": ["missing", "installed", "active", "restricted"]
+    },
+    "activeTier": {
+      "type": "string",
+      "enum": ["Tier1", "Tier2", "Tier3", "Developer"]
+    },
+    "unlockedTiers": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["Tier1", "Tier2", "Tier3", "Developer"]
+      }
+    },
+    "unlockedObjectIds": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "updatedAt": { "type": "string" }
+  },
+  "required": [
+    "version",
+    "chipState",
+    "activeTier",
+    "unlockedTiers",
+    "unlockedObjectIds",
+    "updatedAt"
+  ]
+}

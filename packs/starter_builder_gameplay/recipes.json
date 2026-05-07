@@ -1,0 +1,11 @@
+[
+  { "objectId": "tier1_chair_01", "components": [], "seconds": 0 },
+  { "objectId": "tier1_table_01", "components": [], "seconds": 0 },
+  { "objectId": "tier1_cabinet_01", "components": [], "seconds": 0 },
+  { "objectId": "tier1_wall_poster_01", "components": [], "seconds": 0 },
+  { "objectId": "tier1_planter_01", "components": [], "seconds": 0 },
+  { "objectId": "tier1_rug_01", "components": [], "seconds": 0 },
+  { "objectId": "blocked_npc_terminal_01", "components": [], "seconds": 0 },
+  { "objectId": "blocked_vehicle_shell_01", "components": [], "seconds": 0 },
+  { "objectId": "blocked_quest_prop_01", "components": [], "seconds": 0 }
+]

@@ -21,12 +21,13 @@ This list matches the project rule set in **`.manager/ruls.md`**: the MVP **must
 ## What CyberBuilder still does
 
 - Validates JSON packs under `packs/*`.
-- Exports **World Builder–compatible** path lists for **allowed** object types you define in `objects.json` (see `docs/PACK_FORMAT.md`).
+- Exports **World Builder–compatible** path lists for **allowed** object types you define in `objects.json` (see `docs/reference/PACK_FORMAT.md`).
 - Leaves **spawning, scanning, deletion, and in-world editing** to **World Builder** (or other tools), not to CyberBuilder core.
 
 ## Practical guidance
 
-- Prefer **static build props** (furniture, decor, lights, meshes) with **verified** `resourcePath` values. Do not guess game paths; see `docs/PACK_FORMAT.md` and `docs/MODDER_QUICKSTART.md`.
+- Prefer **static build props** (furniture, decor, lights, meshes) with **verified** `resourcePath` values. Do not guess game paths; see `docs/reference/PACK_FORMAT.md` and `docs/setup/MODDER_QUICKSTART.md`.
 - If an asset could fall into a gray area (e.g. a prop that doubles as a quest item), **exclude it** from CyberBuilder until a later product phase explicitly supports it.
 
 For acceptance criteria and CI expectations, see **`.manager/dod.md`** and **`.manager/ci-gate.md`**.
+
